@@ -1,6 +1,7 @@
 import axios, { AxiosInstance } from "axios";
 import decamelizeKeys from "decamelize-keys";
 import camelcaseKeys from "camelcase-keys";
+import { LOCAL_APP_MODE } from "@/constants";
 
 const ONE_MINUTE = 1000 * 60; // 1 minute
 
@@ -36,6 +37,10 @@ export class Client {
       },
     });
     this.api.interceptors.request.use((config) => {
+      if (LOCAL_APP_MODE) {
+        return Promise.reject(new Error("Enjoy API is disabled in local mode"));
+      }
+
       config.headers.Authorization = `Bearer ${accessToken}`;
       config.headers["Accept-Language"] = locale;
 

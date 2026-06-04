@@ -87,6 +87,7 @@ export const useTranscriptions = (media: AudioType | VideoType) => {
 
   const findTranscriptionOnline = async () => {
     if (!media) return;
+    if (!webApi) return null;
 
     try {
       const result = await webApi.transcriptions({

@@ -196,10 +196,7 @@ export class Speech extends Model<Speech> {
 
     let openaiConfig: ClientOptions = {};
     if (engine === "enjoyai") {
-      openaiConfig = {
-        apiKey: (await UserSetting.accessToken()) as string,
-        baseURL: `${settings.apiUrl()}/api/ai`,
-      };
+      throw new Error("EnjoyAI TTS is disabled in local mode");
     } else if (engine === "openai") {
       const defaultConfig = settings.getSync("openai") as LlmProviderType;
       if (!defaultConfig.key) {

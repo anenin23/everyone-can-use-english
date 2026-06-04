@@ -54,8 +54,8 @@ export const DocumentAddButton = () => {
           autoNextSpeech: true,
           layout: "horizontal",
           tts: {
-            engine: "enjoyai",
-            model: "openai/tts-1",
+            engine: "openai",
+            model: "tts-1",
             language: learningLanguage,
             voice: "alloy",
           },

@@ -42,11 +42,13 @@ export const ConversationFormGPT = (props: {
                 </SelectTrigger>
               </FormControl>
               <SelectContent>
-                {Object.keys(gptProviders).map((key) => (
-                  <SelectItem key={key} value={key}>
-                    {gptProviders[key].name}
-                  </SelectItem>
-                ))}
+                {Object.keys(gptProviders || {})
+                  .filter((key) => gptProviders[key])
+                  .map((key) => (
+                    <SelectItem key={key} value={key}>
+                      {gptProviders[key].name}
+                    </SelectItem>
+                  ))}
               </SelectContent>
             </Select>
             <FormDescription>
@@ -100,7 +102,7 @@ export const ConversationFormGPT = (props: {
         )}
       />
 
-      {gptProviders[form.watch("engine")]?.configurable.includes(
+      {gptProviders[form.watch("engine")]?.configurable?.includes(
         "temperature"
       ) && (
         <FormField
@@ -130,7 +132,7 @@ export const ConversationFormGPT = (props: {
         />
       )}
 
-      {gptProviders[form.watch("engine")]?.configurable.includes(
+      {gptProviders[form.watch("engine")]?.configurable?.includes(
         "maxTokens"
       ) && (
         <FormField
@@ -157,7 +159,7 @@ export const ConversationFormGPT = (props: {
         />
       )}
 
-      {gptProviders[form.watch("engine")]?.configurable.includes(
+      {gptProviders[form.watch("engine")]?.configurable?.includes(
         "presencePenalty"
       ) && (
         <FormField
@@ -186,7 +188,7 @@ export const ConversationFormGPT = (props: {
         />
       )}
 
-      {gptProviders[form.watch("engine")]?.configurable.includes(
+      {gptProviders[form.watch("engine")]?.configurable?.includes(
         "frequencyPenalty"
       ) && (
         <FormField
@@ -215,7 +217,7 @@ export const ConversationFormGPT = (props: {
         />
       )}
 
-      {gptProviders[form.watch("engine")]?.configurable.includes(
+      {gptProviders[form.watch("engine")]?.configurable?.includes(
         "numberOfChoices"
       ) && (
         <FormField

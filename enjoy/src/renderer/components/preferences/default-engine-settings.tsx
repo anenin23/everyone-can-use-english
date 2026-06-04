@@ -22,18 +22,44 @@ import {
 } from "@renderer/context";
 import { useContext, useEffect, useState } from "react";
 import { GPT_PROVIDERS } from "@renderer/components";
+import { LOCAL_APP_MODE } from "@/constants";
+
+const LOCAL_GPT_PROVIDERS = {
+  openai: GPT_PROVIDERS.openai,
+  ollama: GPT_PROVIDERS.ollama,
+};
+
+const DEFAULT_LOCAL_ENGINE: GptEngineSettingType = {
+  name: "ollama",
+  models: {
+    default: "llama3.2",
+  },
+};
 
 export const DefaultEngineSettings = () => {
   const { currentGptEngine, setGptEngine, openai } = useContext(
     AISettingsProviderContext
   );
   const { webApi } = useContext(AppSettingsProviderContext);
-  const [providers, setProviders] = useState<any>(GPT_PROVIDERS);
+  const [providers, setProviders] = useState<any>(
+    LOCAL_APP_MODE ? LOCAL_GPT_PROVIDERS : GPT_PROVIDERS
+  );
   const [editing, setEditing] = useState(false);
+  const safeGptEngine =
+    currentGptEngine?.name && providers[currentGptEngine.name]
+      ? currentGptEngine
+      : LOCAL_APP_MODE
+      ? DEFAULT_LOCAL_ENGINE
+      : ({
+          name: "enjoyai",
+          models: {
+            default: "gpt-4o",
+          },
+        } as GptEngineSettingType);
 
   const gptEngineSchema = z
     .object({
-      name: z.enum(["enjoyai", "openai"]),
+      name: z.enum(["enjoyai", "openai", "ollama"]),
       models: z.object({
         default: z.string(),
         lookup: z.string().optional(),
@@ -47,8 +73,8 @@ export const DefaultEngineSettings = () => {
   const form = useForm<z.infer<typeof gptEngineSchema>>({
     resolver: zodResolver(gptEngineSchema),
     values: {
-      name: currentGptEngine.name as "enjoyai" | "openai",
-      models: currentGptEngine.models || {},
+      name: safeGptEngine.name as "enjoyai" | "openai" | "ollama",
+      models: safeGptEngine.models || {},
     },
   });
 
@@ -56,18 +82,25 @@ export const DefaultEngineSettings = () => {
     if (form.watch("name") === "openai") {
       const customModels = openai?.models?.split(",")?.filter(Boolean);
 
-      return customModels?.length ? customModels : providers.openai.models;
+      return customModels?.length ? customModels : providers.openai?.models || [];
+    } else if (form.watch("name") === "ollama") {
+      return providers.ollama?.models?.length
+        ? providers.ollama.models
+        : [safeGptEngine.models?.default || "llama3.2"];
     } else {
-      return providers.enjoyai.models;
+      return providers.enjoyai?.models || [];
     }
   };
 
   const onSubmit = async (data: z.infer<typeof gptEngineSchema>) => {
     const { name, models } = data;
 
-    let options = [...providers[name].models];
+    let options = [...(providers[name]?.models || [])];
     if (name === "openai" && openai?.models) {
       options = openai.models.split(",");
+    }
+    if (!options.length) {
+      options = [models.default || "llama3.2"];
     }
 
     models.default ||= options[0];
@@ -86,6 +119,8 @@ export const DefaultEngineSettings = () => {
   };
 
   useEffect(() => {
+    if (LOCAL_APP_MODE || !webApi) return;
+
     webApi
       .config("gpt_providers")
       .then((data) => {
@@ -131,8 +166,11 @@ export const DefaultEngineSettings = () => {
                           ></SelectValue>
                         </SelectTrigger>
                         <SelectContent>
-                          <SelectItem value="enjoyai">EnjoyAI</SelectItem>
+                          {!LOCAL_APP_MODE && (
+                            <SelectItem value="enjoyai">EnjoyAI</SelectItem>
+                          )}
                           <SelectItem value="openai">OpenAI</SelectItem>
+                          <SelectItem value="ollama">Ollama</SelectItem>
                         </SelectContent>
                       </Select>
                     </div>
@@ -141,6 +179,8 @@ export const DefaultEngineSettings = () => {
                       {form.watch("name") === "openai" && t("openAiEngineTips")}
                       {form.watch("name") === "enjoyai" &&
                         t("enjoyAiEngineTips")}
+                      {form.watch("name") === "ollama" &&
+                        t("ensureYouHaveOllamaRunningLocallyAndHasAtLeastOneModel")}
                     </div>
                   </FormItem>
                 )}

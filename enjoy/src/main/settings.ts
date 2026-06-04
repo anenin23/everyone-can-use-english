@@ -1,5 +1,11 @@
 import settings from "electron-settings";
-import { LIBRARY_PATH_SUFFIX, DATABASE_NAME, WEB_API_URL } from "@/constants";
+import {
+  LIBRARY_PATH_SUFFIX,
+  DATABASE_NAME,
+  WEB_API_URL,
+  LOCAL_APP_MODE,
+  LOCAL_USER,
+} from "@/constants";
 import { ipcMain, app } from "electron";
 import path from "path";
 import fs from "fs-extra";
@@ -34,6 +40,16 @@ const libraryPath = () => {
   return library;
 };
 
+const currentUser = () => {
+  const user = settings.getSync(AppSettingsKeyEnum.USER) as UserType;
+  if (LOCAL_APP_MODE && !user?.id) {
+    settings.setSync(AppSettingsKeyEnum.USER, LOCAL_USER);
+    return LOCAL_USER;
+  }
+
+  return user;
+};
+
 const cachePath = () => {
   const tmpDir = path.join(libraryPath(), "cache");
   fs.ensureDirSync(tmpDir);
@@ -51,7 +67,7 @@ const dbPath = () => {
 };
 
 const userDataPath = () => {
-  const userId = settings.getSync("user.id");
+  const userId = currentUser()?.id;
   if (!userId) return null;
 
   const userData = path.join(libraryPath(), userId.toString());
@@ -93,10 +109,15 @@ export default {
     });
 
     ipcMain.handle("app-settings-get-user", (_event) => {
-      return settings.getSync(AppSettingsKeyEnum.USER);
+      return currentUser();
     });
 
     ipcMain.handle("app-settings-set-user", (_event, user) => {
+      if (LOCAL_APP_MODE && !user?.id) {
+        settings.setSync(AppSettingsKeyEnum.USER, LOCAL_USER);
+        return;
+      }
+
       settings.setSync(AppSettingsKeyEnum.USER, user);
     });
 

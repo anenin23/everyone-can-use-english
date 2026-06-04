@@ -41,11 +41,13 @@ export const GPTForm = (props: { form: ReturnType<typeof useForm> }) => {
                 </SelectTrigger>
               </FormControl>
               <SelectContent>
-                {Object.keys(gptProviders).map((key) => (
-                  <SelectItem key={key} value={key}>
-                    {gptProviders[key].name}
-                  </SelectItem>
-                ))}
+                {Object.keys(gptProviders || {})
+                  .filter((key) => gptProviders[key])
+                  .map((key) => (
+                    <SelectItem key={key} value={key}>
+                      {gptProviders[key].name}
+                    </SelectItem>
+                  ))}
               </SelectContent>
             </Select>
             <FormDescription>
@@ -73,8 +75,8 @@ export const GPTForm = (props: { form: ReturnType<typeof useForm> }) => {
               </FormControl>
               <SelectContent>
                 {(
-                  gptProviders[form.watch("config.gpt.engine") as string]
-                    ?.models || []
+                  gptProviders[form.watch("config.gpt.engine") as string]?.models ||
+                  []
                 ).map((option: string) => (
                   <SelectItem key={option} value={option}>
                     {option}

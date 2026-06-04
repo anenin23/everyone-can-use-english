@@ -20,6 +20,18 @@ export const TTSForm = (props: { form: ReturnType<typeof useForm> }) => {
   const { form } = props;
   const { ttsProviders } = useContext(AISettingsProviderContext);
 
+  const voices = () => {
+    const engine = form.watch("config.tts.engine") as string;
+    const model = form.watch("config.tts.model") as string;
+
+    if (engine === "enjoyai") {
+      const provider = ttsProviders.enjoyai;
+      return provider?.voices?.[model?.split("/")?.[0]] || [];
+    }
+
+    return ttsProviders[engine]?.voices || [];
+  };
+
   return (
     <>
       <FormField
@@ -39,11 +51,13 @@ export const TTSForm = (props: { form: ReturnType<typeof useForm> }) => {
                 </SelectTrigger>
               </FormControl>
               <SelectContent>
-                {Object.keys(ttsProviders).map((key) => (
-                  <SelectItem key={key} value={key}>
-                    {ttsProviders[key].name}
-                  </SelectItem>
-                ))}
+                {Object.keys(ttsProviders || {})
+                  .filter((key) => ttsProviders[key])
+                  .map((key) => (
+                    <SelectItem key={key} value={key}>
+                      {ttsProviders[key].name}
+                    </SelectItem>
+                  ))}
               </SelectContent>
             </Select>
             <FormMessage />
@@ -130,16 +144,7 @@ export const TTSForm = (props: { form: ReturnType<typeof useForm> }) => {
                 </SelectTrigger>
               </FormControl>
               <SelectContent>
-                {(
-                  (form.watch("config.tts.engine") === "enjoyai"
-                    ? ttsProviders.enjoyai.voices[
-                        (form.watch("config.tts.model") as string)?.split(
-                          "/"
-                        )?.[0]
-                      ]
-                    : ttsProviders[form.watch("config.tts.engine") as string]
-                        ?.voices) || []
-                ).map((voice: any) => {
+                {voices().map((voice: any) => {
                   if (typeof voice === "string") {
                     return (
                       <SelectItem key={voice} value={voice}>

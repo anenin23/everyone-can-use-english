@@ -19,6 +19,7 @@ import {
 import { MoreHorizontalIcon } from "lucide-react";
 import Markdown from "react-markdown";
 import { t } from "i18next";
+import { LOCAL_APP_MODE } from "@/constants";
 
 export const NoteCard = (props: {
   note: NoteType;
@@ -117,9 +118,11 @@ const NoteActionsDropdownMenu = (props: {
             </DropdownMenuItem>
           )}
 
-          <DropdownMenuItem onClick={() => setSharing(true)}>
-            {t("share")}
-          </DropdownMenuItem>
+          {!LOCAL_APP_MODE && (
+            <DropdownMenuItem onClick={() => setSharing(true)}>
+              {t("share")}
+            </DropdownMenuItem>
+          )}
 
           <DropdownMenuItem onClick={() => setDeleting(true)}>
             {t("delete")}

@@ -1,4 +1,4 @@
-import { STORAGE_WORKER_ENDPOINT } from "@/constants";
+import { LOCAL_APP_MODE, STORAGE_WORKER_ENDPOINT } from "@/constants";
 import axios, { AxiosInstance } from "axios";
 import fs from "fs-extra";
 import log from "@main/logger";
@@ -22,14 +22,24 @@ class Storage {
   }
 
   getUrl(key: string) {
+    if (LOCAL_APP_MODE) return null;
+
     return `${STORAGE_WORKER_ENDPOINT}/${key}`;
   }
 
   get(key: string) {
+    if (LOCAL_APP_MODE) {
+      return Promise.reject(new Error("Storage is disabled in local mode"));
+    }
+
     return this.api.get(`/${key}`);
   }
 
   put(key: string, filePath: string, contentType?: string) {
+    if (LOCAL_APP_MODE) {
+      return Promise.reject(new Error("Storage is disabled in local mode"));
+    }
+
     const data = fs.readFileSync(filePath);
     const form = new FormData();
     form.append("file", new Blob([data], { type: contentType }), key);

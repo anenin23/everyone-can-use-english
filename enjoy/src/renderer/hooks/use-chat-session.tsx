@@ -309,8 +309,8 @@ export const useChatSession = (chatId: string) => {
 
   const buildLlm = (member: ChatMemberType) => {
     const {
-      engine = "enjoyai",
-      model = "gpt-4o",
+      engine = DEFAULT_GPT_CONFIG.engine,
+      model = DEFAULT_GPT_CONFIG.model,
       temperature,
       maxCompletionTokens,
       frequencyPenalty,
@@ -319,14 +319,16 @@ export const useChatSession = (chatId: string) => {
     } = member.config.gpt;
 
     if (engine === "enjoyai") {
-      if (!user.accessToken) {
-        throw new Error(t("authorizationExpired"));
+      throw new Error("EnjoyAI is disabled in local mode");
+    } else if (engine === "openai") {
+      if (!openai?.key) {
+        throw new Error(t("openaiKeyRequired"));
       }
 
       return new ChatOpenAI({
-        openAIApiKey: user.accessToken,
+        openAIApiKey: openai.key,
         configuration: {
-          baseURL: `${apiUrl}/api/ai`,
+          baseURL: openai.baseUrl,
         },
         maxRetries: 0,
         modelName: model,
@@ -336,15 +338,11 @@ export const useChatSession = (chatId: string) => {
         presencePenalty,
         n: numberOfChoices,
       });
-    } else if (engine === "openai") {
-      if (!openai.key) {
-        throw new Error(t("openaiKeyRequired"));
-      }
-
+    } else if (engine === "ollama") {
       return new ChatOpenAI({
-        openAIApiKey: openai.key,
+        openAIApiKey: "ollama",
         configuration: {
-          baseURL: openai.baseUrl,
+          baseURL: currentGptEngine?.baseUrl || "http://localhost:11434/v1",
         },
         maxRetries: 0,
         modelName: model,

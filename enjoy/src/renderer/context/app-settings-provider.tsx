@@ -1,9 +1,13 @@
 import { createContext, useContext, useEffect, useState } from "react";
-import { WEB_API_URL, LANGUAGES, IPA_MAPPINGS } from "@/constants";
+import {
+  WEB_API_URL,
+  LANGUAGES,
+  IPA_MAPPINGS,
+  LOCAL_APP_MODE,
+  LOCAL_USER,
+} from "@/constants";
 import { Client } from "@/api";
 import i18n from "@renderer/i18n";
-import ahoy from "ahoy.js";
-import { type Consumer, createConsumer } from "@rails/actioncable";
 import { DbProviderContext } from "@renderer/context";
 import { UserSettingKeyEnum } from "@/types/enums";
 import {
@@ -27,11 +31,9 @@ import {
 import { t } from "i18next";
 import { redirect } from "react-router-dom";
 import { Deposit } from "@renderer/components";
-import Bugsnag from "@bugsnag/electron";
-import BugsnagPluginReact from "@bugsnag/plugin-react";
 
 type AppSettingsProviderState = {
-  webApi: Client;
+  webApi: Client | null;
   apiUrl?: string;
   setApiUrl?: (url: string) => Promise<void>;
   user: UserType | null;
@@ -54,8 +56,7 @@ type AppSettingsProviderState = {
   setProxy?: (config: ProxyConfigType) => Promise<void>;
   vocabularyConfig?: VocabularyConfigType;
   setVocabularyConfig?: (config: VocabularyConfigType) => Promise<void>;
-  cable?: Consumer;
-  ahoy?: typeof ahoy;
+  cable?: any;
   recorderConfig?: RecorderConfigType;
   setRecorderConfig?: (config: RecorderConfigType) => Promise<void>;
   // remote config
@@ -85,9 +86,10 @@ export const AppSettingsProvider = ({
 }) => {
   const [version, setVersion] = useState<string>("");
   const [latestVersion, setLatestVersion] = useState<string>("");
-  const [apiUrl, setApiUrl] = useState<string>(WEB_API_URL);
+  const [apiUrl, setApiUrl] = useState<string>(
+    LOCAL_APP_MODE ? "" : WEB_API_URL
+  );
   const [webApi, setWebApi] = useState<Client>(null);
-  const [cable, setCable] = useState<Consumer>();
   const [user, setUser] = useState<UserType | null>(null);
   const [libraryPath, setLibraryPath] = useState("");
   const [language, setLanguage] = useState<"en" | "zh-CN">();
@@ -156,14 +158,25 @@ export const AppSettingsProvider = ({
   };
 
   const fetchApiUrl = async () => {
+    if (LOCAL_APP_MODE) {
+      setApiUrl("");
+      return;
+    }
+
     const apiUrl = await EnjoyApp.app.apiUrl();
     setApiUrl(apiUrl);
   };
 
   const autoLogin = async () => {
     const currentUser = await EnjoyApp.appSettings.getUser();
-    if (!currentUser) return;
+    if (LOCAL_APP_MODE) {
+      const localUser = currentUser?.id ? currentUser : LOCAL_USER;
+      await EnjoyApp.appSettings.setUser(localUser);
+      setUser(localUser);
+      return;
+    }
 
+    if (!currentUser) return;
     setUser(currentUser);
   };
 
@@ -171,13 +184,19 @@ export const AppSettingsProvider = ({
     if (!user?.id) return;
 
     setUser(user);
-    if (user.accessToken) {
+    if (LOCAL_APP_MODE || user.accessToken) {
       // Set current user to App settings
       EnjoyApp.appSettings.setUser({ id: user.id, name: user.name });
     }
   };
 
   const logout = () => {
+    if (LOCAL_APP_MODE) {
+      setUser(LOCAL_USER);
+      EnjoyApp.appSettings.setUser(LOCAL_USER);
+      return;
+    }
+
     setUser(null);
     EnjoyApp.appSettings.setUser(null);
   };
@@ -206,17 +225,11 @@ export const AppSettingsProvider = ({
   };
 
   const setApiUrlHandler = async (url: string) => {
+    if (LOCAL_APP_MODE) return;
+
     EnjoyApp.appSettings.setApiUrl(url).then(() => {
       EnjoyApp.app.reload();
     });
-  };
-
-  const createCable = async (token: string) => {
-    if (!token) return;
-
-    const wsUrl = await EnjoyApp.app.wsUrl();
-    const consumer = createConsumer(wsUrl + "/cable?token=" + token);
-    setCable(consumer);
   };
 
   const fetchRecorderConfig = async () => {
@@ -261,6 +274,8 @@ export const AppSettingsProvider = ({
   };
 
   const refreshAccount = async () => {
+    if (LOCAL_APP_MODE || !webApi) return;
+
     webApi.me().then((u) => {
       setUser({
         ...user,
@@ -286,6 +301,10 @@ export const AppSettingsProvider = ({
   }, []);
 
   useEffect(() => {
+    if (LOCAL_APP_MODE) {
+      setWebApi(null);
+      return;
+    }
     if (!apiUrl) return;
 
     setWebApi(
@@ -303,14 +322,7 @@ export const AppSettingsProvider = ({
   }, [user?.accessToken, apiUrl, language]);
 
   useEffect(() => {
-    if (!apiUrl) return;
-
-    ahoy.configure({
-      urlPrefix: apiUrl,
-    });
-  }, [apiUrl]);
-
-  useEffect(() => {
+    if (LOCAL_APP_MODE) return;
     if (!webApi) return;
     if (ipaMappings && latestVersion) return;
 
@@ -327,10 +339,20 @@ export const AppSettingsProvider = ({
     if (!user) return;
 
     db.connect().then(async () => {
+      if (LOCAL_APP_MODE) {
+        const profile =
+          (await EnjoyApp.userSettings.get(UserSettingKeyEnum.PROFILE)) ||
+          user ||
+          LOCAL_USER;
+        await EnjoyApp.userSettings.set(UserSettingKeyEnum.PROFILE, profile);
+        setUser(profile);
+        EnjoyApp.appSettings.setUser({ id: profile.id, name: profile.name });
+        return;
+      }
+
       // Login via API, update profile to DB
       if (user.accessToken) {
         EnjoyApp.userSettings.set(UserSettingKeyEnum.PROFILE, user);
-        createCable(user.accessToken);
       } else {
         // Auto login from local settings, get full profile from DB
         const profile = await EnjoyApp.userSettings.get(
@@ -372,8 +394,7 @@ export const AppSettingsProvider = ({
         vocabularyConfig,
         setVocabularyConfig: setVocabularyConfigHandler,
         initialized: Boolean(user && db.state === "connected" && libraryPath),
-        ahoy,
-        cable,
+        cable: undefined,
         recorderConfig,
         setRecorderConfig: setRecorderConfigHandler,
         ipaMappings,

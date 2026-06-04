@@ -47,15 +47,17 @@ export const AiLookupResult = (props: {
   };
 
   const fetchCachedLookup = async () => {
-    const remoteLookup = await webApi.lookup({
-      word,
-      context,
-      sourceId,
-      sourceType,
-    });
-    if (remoteLookup?.meaning) {
-      setResult(remoteLookup);
-      return;
+    if (webApi) {
+      const remoteLookup = await webApi.lookup({
+        word,
+        context,
+        sourceId,
+        sourceType,
+      });
+      if (remoteLookup?.meaning) {
+        setResult(remoteLookup);
+        return;
+      }
     }
 
     const cached = await EnjoyApp.cacheObjects.get(

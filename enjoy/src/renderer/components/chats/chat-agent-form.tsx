@@ -60,6 +60,8 @@ export const ChatAgentForm = (props: {
   >(CHAT_AGENT_TEMPLATES);
 
   const fetchTemplates = () => {
+    if (!webApi) return;
+
     webApi.config("chat_agent_templates").then((tpls) => {
       if (Array.isArray(tpls) && tpls.length > 0) {
         setTemplates(tpls);

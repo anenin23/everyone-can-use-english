@@ -23,7 +23,7 @@ import {
   AISettingsProviderContext,
 } from "@renderer/context";
 import { conversationsReducer } from "@renderer/reducers";
-import { GPT_PRESETS } from "@/constants";
+import { GPT_PRESETS, LOCAL_APP_MODE } from "@/constants";
 
 export default () => {
   const [searchParams] = useSearchParams();
@@ -42,13 +42,12 @@ export default () => {
     ttsPreset: {
       key: "tts",
       name: "TTS",
-      engine: currentGptEngine?.name,
+      engine: LOCAL_APP_MODE ? "openai" : currentGptEngine?.name,
       configuration: {
         type: "tts",
         tts: {
-          engine: currentGptEngine?.name,
-          model:
-            currentGptEngine?.name === "enjoyai" ? "openai/tts-1" : "tts-1",
+          engine: LOCAL_APP_MODE ? "openai" : currentGptEngine?.name,
+          model: LOCAL_APP_MODE ? "tts-1" : "openai/tts-1",
           voice: "alloy",
         },
       },
@@ -70,6 +69,7 @@ export default () => {
   useEffect(() => {
     const postId = searchParams.get("postId");
     if (!postId) return;
+    if (!webApi) return;
 
     webApi.post(postId).then((post) => {
       const preset: any = post.metadata.content;
@@ -141,8 +141,8 @@ export default () => {
         engine: currentGptEngine.name,
         model: currentGptEngine.models.default,
         tts: {
-          engine: currentGptEngine.name,
-          model: currentGptEngine.name === "enjoyai" ? "openai/tts-1" : "tts-1",
+          engine: LOCAL_APP_MODE ? "openai" : currentGptEngine.name,
+          model: LOCAL_APP_MODE ? "tts-1" : "openai/tts-1",
         },
       },
     };
@@ -153,14 +153,15 @@ export default () => {
       configuration: {
         type: "tts",
         tts: {
-          engine: currentGptEngine.name,
-          model: currentGptEngine.name === "enjoyai" ? "openai/tts-1" : "tts-1",
+          engine: LOCAL_APP_MODE ? "openai" : currentGptEngine.name,
+          model: LOCAL_APP_MODE ? "tts-1" : "openai/tts-1",
           voice: "alloy",
         },
       },
     };
 
-    try {
+    if (!LOCAL_APP_MODE && webApi) {
+      try {
       const gptPresets: any[] = await webApi.config("gpt_presets");
       const defaultGpt = await webApi.config("default_gpt_preset");
       const defaultTts = await webApi.config("default_tts_preset");
@@ -181,8 +182,9 @@ export default () => {
       if (defaultTts.engine === currentGptEngine.name) {
         defaultTtsPreset = defaultTts;
       }
-    } catch (error) {
-      console.error(error);
+      } catch (error) {
+        console.error(error);
+      }
     }
 
     const gptPresets = presets.map((preset) =>
@@ -193,9 +195,8 @@ export default () => {
           model: currentGptEngine.models.default,
           tts: {
             ...preset.configuration.tts,
-            engine: currentGptEngine.name,
-            model:
-              currentGptEngine.name === "enjoyai" ? "openai/tts-1" : "tts-1",
+            engine: LOCAL_APP_MODE ? "openai" : currentGptEngine.name,
+            model: LOCAL_APP_MODE ? "tts-1" : "openai/tts-1",
           },
         },
       })

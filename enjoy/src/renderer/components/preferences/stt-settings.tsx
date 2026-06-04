@@ -15,6 +15,7 @@ import {
 import { useContext, useEffect, useState } from "react";
 import { SttEngineOptionEnum } from "@/types/enums";
 import { EchogardenSttSettings } from "@renderer/components";
+import { LOCAL_APP_MODE } from "@/constants";
 
 export const SttSettings = () => {
   const {
@@ -106,12 +107,16 @@ export const SttSettings = () => {
             <SelectItem value={SttEngineOptionEnum.LOCAL}>
               {t("local")}
             </SelectItem>
-            <SelectItem value={SttEngineOptionEnum.ENJOY_AZURE}>
-              {t("enjoyAzure")}
-            </SelectItem>
-            <SelectItem value={SttEngineOptionEnum.ENJOY_CLOUDFLARE}>
-              {t("enjoyCloudflare")}
-            </SelectItem>
+            {!LOCAL_APP_MODE && (
+              <SelectItem value={SttEngineOptionEnum.ENJOY_AZURE}>
+                {t("enjoyAzure")}
+              </SelectItem>
+            )}
+            {!LOCAL_APP_MODE && (
+              <SelectItem value={SttEngineOptionEnum.ENJOY_CLOUDFLARE}>
+                {t("enjoyCloudflare")}
+              </SelectItem>
+            )}
             <SelectItem value={SttEngineOptionEnum.OPENAI}>OpenAI</SelectItem>
           </SelectContent>
         </Select>

@@ -1,4 +1,4 @@
-import { createHashRouter } from "react-router-dom";
+import { createHashRouter, Navigate } from "react-router-dom";
 import { Layout } from "@renderer/components";
 import Conversations from "./pages/conversations";
 import Conversation from "./pages/conversation";
@@ -26,6 +26,9 @@ import Course from "./pages/courses/show";
 import Chapter from "./pages/courses/chapter";
 import Chats from "./pages/chats";
 import { ProtectedPage } from "./pages/protected-page";
+import { LOCAL_APP_MODE } from "@/constants";
+
+const localRedirect = <Navigate to="/" replace />;
 
 export default createHashRouter([
   {
@@ -52,7 +55,9 @@ export default createHashRouter([
       },
       {
         path: "/courses",
-        element: (
+        element: LOCAL_APP_MODE ? (
+          localRedirect
+        ) : (
           <ProtectedPage>
             <Courses />
           </ProtectedPage>
@@ -60,7 +65,9 @@ export default createHashRouter([
       },
       {
         path: "/courses/:id",
-        element: (
+        element: LOCAL_APP_MODE ? (
+          localRedirect
+        ) : (
           <ProtectedPage>
             <Course />
           </ProtectedPage>
@@ -68,7 +75,9 @@ export default createHashRouter([
       },
       {
         path: "/courses/:id/chapters/:sequence",
-        element: (
+        element: LOCAL_APP_MODE ? (
+          localRedirect
+        ) : (
           <ProtectedPage>
             <Chapter />
           </ProtectedPage>
@@ -76,7 +85,9 @@ export default createHashRouter([
       },
       {
         path: "/community",
-        element: (
+        element: LOCAL_APP_MODE ? (
+          localRedirect
+        ) : (
           <ProtectedPage>
             <Community />
           </ProtectedPage>
@@ -84,7 +95,9 @@ export default createHashRouter([
       },
       {
         path: "/users/:id",
-        element: (
+        element: LOCAL_APP_MODE ? (
+          localRedirect
+        ) : (
           <ProtectedPage>
             <User />
           </ProtectedPage>
@@ -92,7 +105,9 @@ export default createHashRouter([
       },
       {
         path: "/profile",
-        element: (
+        element: LOCAL_APP_MODE ? (
+          localRedirect
+        ) : (
           <ProtectedPage>
             <Profile />
           </ProtectedPage>
@@ -116,7 +131,9 @@ export default createHashRouter([
       },
       {
         path: "/pronunciation_assessments",
-        element: (
+        element: LOCAL_APP_MODE ? (
+          localRedirect
+        ) : (
           <ProtectedPage>
             <PronunciationAssessmentsIndex />
           </ProtectedPage>
@@ -124,7 +141,9 @@ export default createHashRouter([
       },
       {
         path: "/pronunciation_assessments/new",
-        element: (
+        element: LOCAL_APP_MODE ? (
+          localRedirect
+        ) : (
           <ProtectedPage>
             <PronunciationAssessmentsNew />
           </ProtectedPage>
@@ -188,7 +207,9 @@ export default createHashRouter([
       },
       {
         path: "/stories",
-        element: (
+        element: LOCAL_APP_MODE ? (
+          localRedirect
+        ) : (
           <ProtectedPage>
             <Stories />
           </ProtectedPage>
@@ -196,7 +217,9 @@ export default createHashRouter([
       },
       {
         path: "/stories/:id",
-        element: (
+        element: LOCAL_APP_MODE ? (
+          localRedirect
+        ) : (
           <ProtectedPage>
             <Story />
           </ProtectedPage>
@@ -204,7 +227,9 @@ export default createHashRouter([
       },
       {
         path: "/stories/preview/:uri",
-        element: (
+        element: LOCAL_APP_MODE ? (
+          localRedirect
+        ) : (
           <ProtectedPage>
             <StoryPreview />
           </ProtectedPage>

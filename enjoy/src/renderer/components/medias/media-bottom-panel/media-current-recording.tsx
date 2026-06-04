@@ -16,6 +16,7 @@ import { cn, renderPitchContour } from "@renderer/lib/utils";
 import { extractFrequencies } from "@/utils";
 import WaveSurfer from "wavesurfer.js";
 import Regions from "wavesurfer.js/dist/plugins/regions";
+import { LOCAL_APP_MODE } from "@/constants";
 import {
   AlertDialog,
   AlertDialogContent,
@@ -561,15 +562,19 @@ export const MediaCurrentRecording = () => {
       onClick: () => setIsSelectingRegion(!isSelectingRegion),
       asChild: false,
     },
-    {
-      id: "media-share-button",
-      name: "share",
-      label: t("share"),
-      icon: Share2Icon,
-      active: isSharing,
-      onClick: () => setIsSharing(true),
-      asChild: false,
-    },
+    ...(!LOCAL_APP_MODE
+      ? [
+          {
+            id: "media-share-button",
+            name: "share",
+            label: t("share"),
+            icon: Share2Icon,
+            active: isSharing,
+            onClick: () => setIsSharing(true),
+            asChild: false,
+          },
+        ]
+      : []),
     {
       id: "media-download-button",
       name: "download",

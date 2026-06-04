@@ -34,13 +34,20 @@ export const useAiCommand = () => {
     word = word.trim();
     if (!word) return;
 
-    const lookup = await webApi.lookup({
-      word,
-      context,
-      sourceId,
-      sourceType,
-      nativeLanguage,
-    });
+    let lookup: any = { word, context, meaningOptions: [] };
+    if (webApi) {
+      try {
+        lookup = await webApi.lookup({
+          word,
+          context,
+          sourceId,
+          sourceType,
+          nativeLanguage,
+        });
+      } catch (error) {
+        console.error(error);
+      }
+    }
 
     if (lookup.meaning && !force) {
       return lookup;
@@ -64,11 +71,15 @@ export const useAiCommand = () => {
       }
     );
 
-    webApi.updateLookup(lookup.id, {
-      meaning: res,
-      sourceId,
-      sourceType,
-    });
+    if (webApi && lookup.id) {
+      webApi
+        .updateLookup(lookup.id, {
+          meaning: res,
+          sourceId,
+          sourceType,
+        })
+        .catch((error) => console.error(error));
+    }
 
     const result = Object.assign(lookup, {
       meaning: res,
@@ -90,6 +101,8 @@ export const useAiCommand = () => {
     });
     const { words = [], idioms = [] } = res;
 
+    if (!webApi) return { words, idioms };
+
     return webApi.extractVocabularyFromStory(story.id, {
       words,
       idioms,
@@ -107,13 +120,13 @@ export const useAiCommand = () => {
       currentGptEngine.models.translate || currentGptEngine.models.default;
 
     try {
-      const res = await webApi.translations({
-        md5,
-        translatedLanguage: nativeLanguage,
-        engine: modelName,
-      });
+      const res = await webApi?.translations({
+          md5,
+          translatedLanguage: nativeLanguage,
+          engine: modelName,
+        });
 
-      if (res.translations.length > 0) {
+      if (res?.translations.length > 0) {
         translatedContent = res.translations[0].translatedContent;
       }
     } catch (error) {
@@ -127,14 +140,16 @@ export const useAiCommand = () => {
         baseUrl: currentGptEngine.baseUrl,
       });
 
-      webApi.createTranslation({
-        md5,
-        content: text,
-        translatedContent,
-        language: learningLanguage,
-        translatedLanguage: nativeLanguage,
-        engine: modelName,
-      });
+      webApi
+        ?.createTranslation({
+          md5,
+          content: text,
+          translatedContent,
+          language: learningLanguage,
+          translatedLanguage: nativeLanguage,
+          engine: modelName,
+        })
+        .catch((error) => console.error(error));
     }
 
     if (cacheKey) {

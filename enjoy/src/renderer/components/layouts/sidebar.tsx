@@ -41,6 +41,7 @@ import { AppSettingsProviderContext } from "@renderer/context";
 import { useContext, useEffect } from "react";
 import { NoticiationsChannel } from "@renderer/cables";
 import { useState } from "react";
+import { LOCAL_APP_MODE } from "@/constants";
 
 export const Sidebar = (props: {
   isCollapsed: boolean;
@@ -122,23 +123,27 @@ export const Sidebar = (props: {
               isCollapsed={isCollapsed}
             />
 
-            <SidebarItem
-              href="/courses"
-              label={t("sidebar.courses")}
-              tooltip={t("sidebar.courses")}
-              active={activeTab.startsWith("/courses")}
-              Icon={GraduationCapIcon}
-              isCollapsed={isCollapsed}
-            />
+            {!LOCAL_APP_MODE && (
+              <SidebarItem
+                href="/courses"
+                label={t("sidebar.courses")}
+                tooltip={t("sidebar.courses")}
+                active={activeTab.startsWith("/courses")}
+                Icon={GraduationCapIcon}
+                isCollapsed={isCollapsed}
+              />
+            )}
 
-            <SidebarItem
-              href="/community"
-              label={t("sidebar.community")}
-              tooltip={t("sidebar.community")}
-              active={activeTab.startsWith("/community")}
-              Icon={UsersRoundIcon}
-              isCollapsed={isCollapsed}
-            />
+            {!LOCAL_APP_MODE && (
+              <SidebarItem
+                href="/community"
+                label={t("sidebar.community")}
+                tooltip={t("sidebar.community")}
+                active={activeTab.startsWith("/community")}
+                Icon={UsersRoundIcon}
+                isCollapsed={isCollapsed}
+              />
+            )}
 
             <Separator />
 
@@ -181,15 +186,17 @@ export const Sidebar = (props: {
               isCollapsed={isCollapsed}
             />
 
-            <SidebarItem
-              href="/pronunciation_assessments"
-              label={t("sidebar.pronunciationAssessment")}
-              tooltip={t("sidebar.pronunciationAssessment")}
-              active={activeTab.startsWith("/pronunciation_assessments")}
-              Icon={SpeechIcon}
-              testid="sidebar-pronunciation-assessments"
-              isCollapsed={isCollapsed}
-            />
+            {!LOCAL_APP_MODE && (
+              <SidebarItem
+                href="/pronunciation_assessments"
+                label={t("sidebar.pronunciationAssessment")}
+                tooltip={t("sidebar.pronunciationAssessment")}
+                active={activeTab.startsWith("/pronunciation_assessments")}
+                Icon={SpeechIcon}
+                testid="sidebar-pronunciation-assessments"
+                isCollapsed={isCollapsed}
+              />
+            )}
 
             <SidebarItem
               href="/notes"
@@ -314,6 +321,7 @@ const SidebarHeader = (props: { isCollapsed: boolean }) => {
   const navigate = useNavigate();
 
   useEffect(() => {
+    if (LOCAL_APP_MODE) return;
     if (open) {
       refreshAccount?.();
     }
@@ -321,6 +329,33 @@ const SidebarHeader = (props: { isCollapsed: boolean }) => {
 
   if (!user) {
     return null;
+  }
+
+  if (LOCAL_APP_MODE) {
+    return (
+      <div className="py-3 px-1 sticky top-0 bg-muted z-10 non-draggable-region">
+        <Button
+          variant="ghost"
+          className={`w-full h-12 hover:bg-background ${
+            isCollapsed ? "justify-center px-1" : "justify-start"
+          }`}
+        >
+          <Avatar className="size-8">
+            <AvatarImage src={user.avatarUrl} />
+          </Avatar>
+          {!isCollapsed && (
+            <div className="ml-2 flex flex-col leading-none">
+              <span className="text-left text-sm font-medium line-clamp-1">
+                {user.name}
+              </span>
+              <span className="text-left text-xs text-muted-foreground line-clamp-1">
+                {user.id}
+              </span>
+            </div>
+          )}
+        </Button>
+      </div>
+    );
   }
 
   return (

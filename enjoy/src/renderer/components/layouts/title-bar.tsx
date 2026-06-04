@@ -36,6 +36,7 @@ import {
 } from "lucide-react";
 import { useContext, useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
+import { LOCAL_APP_MODE } from "@/constants";
 
 const INSTALL_URL = "https://1000h.org/enjoy-app/install.html";
 
@@ -167,7 +168,7 @@ export const TitleBar = () => {
               className="size-8 rounded-none non-draggable-region hover:bg-primary/10 relative"
             >
               <HelpCircleIcon className="size-4" />
-              {updaterState && (
+              {!LOCAL_APP_MODE && updaterState && (
                 <span className="absolute top-1 right-1 bg-red-500 rounded-full size-1.5"></span>
               )}
             </Button>
@@ -178,43 +179,51 @@ export const TitleBar = () => {
             align="start"
             side="top"
           >
-            <DropdownMenuGroup>
-              <DropdownMenuItem
-                onClick={() =>
-                  EnjoyApp.shell.openExternal("https://1000h.org/enjoy-app/")
-                }
-                className="flex justify-between space-x-4"
-              >
-                <span className="min-w-fit capitalize">{t("userGuide")}</span>
-                <ExternalLinkIcon className="size-4" />
-              </DropdownMenuItem>
-            </DropdownMenuGroup>
-            <DropdownMenuItem
-              onClick={() => navigate("/community")}
-              className="flex justify-between space-x-4"
-            >
-              <span>{t("feedback")}</span>
-            </DropdownMenuItem>
-            <DropdownMenuSeparator />
+            {!LOCAL_APP_MODE && (
+              <>
+                <DropdownMenuGroup>
+                  <DropdownMenuItem
+                    onClick={() =>
+                      EnjoyApp.shell.openExternal("https://1000h.org/enjoy-app/")
+                    }
+                    className="flex justify-between space-x-4"
+                  >
+                    <span className="min-w-fit capitalize">
+                      {t("userGuide")}
+                    </span>
+                    <ExternalLinkIcon className="size-4" />
+                  </DropdownMenuItem>
+                </DropdownMenuGroup>
+                <DropdownMenuItem
+                  onClick={() => navigate("/community")}
+                  className="flex justify-between space-x-4"
+                >
+                  <span>{t("feedback")}</span>
+                </DropdownMenuItem>
+                <DropdownMenuSeparator />
+              </>
+            )}
             <DropdownMenuItem disabled>
               <span className="text-xs text-muted-foreground">v{version}</span>
             </DropdownMenuItem>
-            <DropdownMenuItem
-              onClick={checkUpdate}
-              className="cursor-pointer relative"
-            >
-              {updaterState && (
-                <span className="absolute top-1 right-1 bg-red-500 rounded-full size-1.5"></span>
-              )}
-              <span className="capitalize flex items-center gap-2">
-                {updaterState === "checking-for-update" &&
-                  t("checkingForUpdate")}
-                {updaterState === "update-available" && t("updateAvailable")}
-                {updaterState === "update-downloaded" && t("quitAndInstall")}
-                {(!updaterState || updaterState === "error") &&
-                  t("checkUpdate")}
-              </span>
-            </DropdownMenuItem>
+            {!LOCAL_APP_MODE && (
+              <DropdownMenuItem
+                onClick={checkUpdate}
+                className="cursor-pointer relative"
+              >
+                {updaterState && (
+                  <span className="absolute top-1 right-1 bg-red-500 rounded-full size-1.5"></span>
+                )}
+                <span className="capitalize flex items-center gap-2">
+                  {updaterState === "checking-for-update" &&
+                    t("checkingForUpdate")}
+                  {updaterState === "update-available" && t("updateAvailable")}
+                  {updaterState === "update-downloaded" && t("quitAndInstall")}
+                  {(!updaterState || updaterState === "error") &&
+                    t("checkUpdate")}
+                </span>
+              </DropdownMenuItem>
+            )}
           </DropdownMenuContent>
         </DropdownMenu>
       </div>

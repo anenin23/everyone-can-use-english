@@ -19,10 +19,10 @@ declare module "segment" {
   export = Segment;
 }
 
-type SupportedLlmProviderType = "enjoyai" | "openai";
+type SupportedLlmProviderType = "enjoyai" | "openai" | "ollama";
 
 type LlmProviderType = {
-  name?: "enjoyai" | "openai";
+  name?: "enjoyai" | "openai" | "ollama";
   key?: string;
   model?: string;
   baseUrl?: string;

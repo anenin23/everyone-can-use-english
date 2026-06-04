@@ -20,6 +20,16 @@ export const ConversationFormTTS = (props: {
   ttsProviders: any;
 }) => {
   const { form, ttsProviders } = props;
+  const voices = () => {
+    const engine = form.watch("configuration.tts.engine");
+    const model = form.watch("configuration.tts.model");
+
+    if (engine === "enjoyai") {
+      return ttsProviders.enjoyai?.voices?.[model?.split("/")?.[0]] || [];
+    }
+
+    return ttsProviders[engine]?.voices || [];
+  };
 
   return (
     <>
@@ -40,11 +50,13 @@ export const ConversationFormTTS = (props: {
                 </SelectTrigger>
               </FormControl>
               <SelectContent>
-                {Object.keys(ttsProviders).map((key) => (
-                  <SelectItem key={key} value={key}>
-                    {ttsProviders[key].name}
-                  </SelectItem>
-                ))}
+                {Object.keys(ttsProviders || {})
+                  .filter((key) => ttsProviders[key])
+                  .map((key) => (
+                    <SelectItem key={key} value={key}>
+                      {ttsProviders[key].name}
+                    </SelectItem>
+                  ))}
               </SelectContent>
             </Select>
             <FormMessage />
@@ -141,14 +153,7 @@ export const ConversationFormTTS = (props: {
                   </SelectTrigger>
                 </FormControl>
                 <SelectContent>
-                  {(
-                    (form.watch("configuration.tts.engine") === "enjoyai"
-                      ? ttsProviders.enjoyai.voices[
-                          form.watch("configuration.tts.model").split("/")[0]
-                        ]
-                      : ttsProviders[form.watch("configuration.tts.engine")]
-                          .voices) || []
-                  ).map((voice: any) => {
+                  {voices().map((voice: any) => {
                     if (typeof voice === "string") {
                       return (
                         <SelectItem key={voice} value={voice}>

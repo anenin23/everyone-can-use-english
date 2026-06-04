@@ -6,7 +6,6 @@ import { useContext } from "react";
 import { ChatMessageHistory, BufferMemory } from "langchain/memory";
 import { ConversationChain } from "langchain/chains";
 import { ChatOpenAI } from "@langchain/openai";
-import { ChatOllama } from "@langchain/ollama";
 import {
   ChatPromptTemplate,
   MessagesPlaceholder,
@@ -17,7 +16,7 @@ import { useSpeech } from "./use-speech";
 
 export const useConversation = () => {
   const { EnjoyApp, user, apiUrl } = useContext(AppSettingsProviderContext);
-  const { openai } = useContext(AISettingsProviderContext);
+  const { currentGptEngine, openai } = useContext(AISettingsProviderContext);
   const { tts } = useSpeech();
 
   const pickLlm = (conversation: ConversationType) => {
@@ -32,19 +31,7 @@ export const useConversation = () => {
     } = conversation.configuration;
 
     if (conversation.engine === "enjoyai") {
-      return new ChatOpenAI({
-        openAIApiKey: user.accessToken,
-        configuration: {
-          baseURL: `${apiUrl}/api/ai`,
-        },
-        maxRetries: 0,
-        modelName: model,
-        temperature,
-        maxTokens,
-        frequencyPenalty,
-        presencePenalty,
-        n: numberOfChoices,
-      });
+      throw new Error("EnjoyAI is disabled in local mode");
     } else if (conversation.engine === "openai") {
       if (!openai) throw new Error("OpenAI API key is required");
 
@@ -62,13 +49,19 @@ export const useConversation = () => {
         n: numberOfChoices,
       });
     } else if (conversation.engine === "ollama") {
-      return new ChatOllama({
-        baseUrl,
-        model,
+      return new ChatOpenAI({
+        openAIApiKey: "ollama",
+        configuration: {
+          baseURL:
+            baseUrl || currentGptEngine?.baseUrl || "http://localhost:11434/v1",
+        },
+        maxRetries: 0,
+        modelName: model,
         temperature,
+        maxTokens,
         frequencyPenalty,
         presencePenalty,
-        maxRetries: 2,
+        n: numberOfChoices,
       });
     }
   };

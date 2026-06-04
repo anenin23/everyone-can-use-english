@@ -16,7 +16,13 @@ import settings from "@main/settings";
 import downloader from "@main/downloader";
 import fs from "fs-extra";
 import log from "@main/logger";
-import { DISCUSS_URL, REPO_URL, WEB_API_URL, WS_URL } from "@/constants";
+import {
+  DISCUSS_URL,
+  LOCAL_APP_MODE,
+  REPO_URL,
+  WEB_API_URL,
+  WS_URL,
+} from "@/constants";
 import { AudibleProvider, TedProvider, YoutubeProvider } from "@main/providers";
 import Ffmpeg from "@main/ffmpeg";
 import { Waveform } from "./waveform";
@@ -41,23 +47,25 @@ const ffmpeg = new Ffmpeg();
 const waveform = new Waveform();
 
 const FEED_BASE_URL = `https://dl.enjoy.bot/app/${process.platform}/${process.arch}`;
-autoUpdater.setFeedURL({
-  url:
-    process.platform === "darwin"
-      ? `${FEED_BASE_URL}/RELEASES.json`
-      : FEED_BASE_URL,
-  headers: {
-    "X-App-Version": app.getVersion(),
-    "User-Agent": format(
-      "%s/%s (%s: %s)",
-      pkg.name,
-      pkg.version,
-      process.platform,
-      process.arch
-    ),
-  },
-  serverType: process.platform === "darwin" ? "json" : "default",
-});
+if (!LOCAL_APP_MODE) {
+  autoUpdater.setFeedURL({
+    url:
+      process.platform === "darwin"
+        ? `${FEED_BASE_URL}/RELEASES.json`
+        : FEED_BASE_URL,
+    headers: {
+      "X-App-Version": app.getVersion(),
+      "User-Agent": format(
+        "%s/%s (%s: %s)",
+        pkg.name,
+        pkg.version,
+        process.platform,
+        process.arch
+      ),
+    },
+    serverType: process.platform === "darwin" ? "json" : "default",
+  });
+}
 
 const main = {
   win: null as BrowserWindow | null,
@@ -795,11 +803,6 @@ ${log}
   // and load the index.html of the app.
   if (MAIN_WINDOW_VITE_DEV_SERVER_URL) {
     mainWindow.loadURL(MAIN_WINDOW_VITE_DEV_SERVER_URL);
-
-    // Open the DevTools.
-    setTimeout(() => {
-      mainWindow.webContents.openDevTools();
-    }, 100);
   } else {
     mainWindow.loadFile(
       path.join(__dirname, `../renderer/${MAIN_WINDOW_VITE_NAME}/index.html`)
@@ -835,12 +838,18 @@ ${log}
     {
       label: "Help",
       submenu: [
-        {
-          label: "Check for Updates",
-          click: () => {
-            shell.openExternal("https://1000h.org/enjoy-app/install.html");
-          },
-        },
+        ...(!LOCAL_APP_MODE
+          ? [
+              {
+                label: "Check for Updates",
+                click: () => {
+                  shell.openExternal(
+                    "https://1000h.org/enjoy-app/install.html"
+                  );
+                },
+              },
+            ]
+          : []),
         {
           label: "Report an Issue",
           click: () => {

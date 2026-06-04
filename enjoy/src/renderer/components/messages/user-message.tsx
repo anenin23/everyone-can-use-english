@@ -41,6 +41,7 @@ import { t } from "i18next";
 import { useNavigate } from "react-router-dom";
 import Markdown from "react-markdown";
 import { formatDateTime } from "@renderer/lib/utils";
+import { LOCAL_APP_MODE } from "@/constants";
 
 export const UserMessageComponent = (props: {
   message: MessageType;
@@ -153,7 +154,7 @@ export const UserMessageComponent = (props: {
               }
             />
 
-            {message.createdAt && (
+            {message.createdAt && !LOCAL_APP_MODE && (
               <AlertDialog>
                 <AlertDialogTrigger asChild>
                   <Share2Icon

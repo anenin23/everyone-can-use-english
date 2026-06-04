@@ -54,7 +54,7 @@ export const LlmMessage = (props: { llmMessage: LlmMessageType }) => {
       sourceId: llmMessage.id,
       text: llmMessage.response,
       configuration: {
-        engine: "enjoyai",
+        engine: "openai",
         model: "tts-1",
         voice: "alloy",
       },

@@ -59,7 +59,7 @@ export const GPT_PROVIDERS: { [key: string]: any } = {
   ollama: {
     name: "Ollama",
     description: t("ensureYouHaveOllamaRunningLocallyAndHasAtLeastOneModel"),
-    baseUrl: "http://localhost:11434",
+    baseUrl: "http://localhost:11434/v1",
     models: [],
     configurable: [
       "model",

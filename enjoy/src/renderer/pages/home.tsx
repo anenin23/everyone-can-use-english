@@ -11,7 +11,7 @@ import { AppSettingsProviderContext } from "@renderer/context";
 import { Button } from "@renderer/components/ui";
 import { t } from "i18next";
 import semver from "semver";
-import { DOWNLOAD_URL } from "@/constants";
+import { DOWNLOAD_URL, LOCAL_APP_MODE } from "@/constants";
 
 export default () => {
   const [channels, setChannels] = useState<string[]>([
@@ -23,6 +23,7 @@ export default () => {
   const { webApi } = useContext(AppSettingsProviderContext);
 
   useEffect(() => {
+    if (LOCAL_APP_MODE) return;
     if (!webApi) return;
 
     webApi.config("ytb_channels").then((channels) => {
@@ -38,14 +39,15 @@ export default () => {
       <UpgradeNotice />
       <div className="max-w-5xl mx-auto px-4 py-6 lg:px-8">
         <div className="space-y-4">
-          <EnrollmentSegment />
+          {!LOCAL_APP_MODE && <EnrollmentSegment />}
           <AudiosSegment />
           <VideosSegment />
           <DocumentsSegment />
-          <AudibleBooksSegment />
-          {channels.map((channel) => (
-            <YoutubeVideosSegment key={channel} channel={channel} />
-          ))}
+          {!LOCAL_APP_MODE && <AudibleBooksSegment />}
+          {!LOCAL_APP_MODE &&
+            channels.map((channel) => (
+              <YoutubeVideosSegment key={channel} channel={channel} />
+            ))}
         </div>
       </div>
     </div>
@@ -54,6 +56,7 @@ export default () => {
 
 const AuthorizationStatusBar = () => {
   const { user, logout } = useContext(AppSettingsProviderContext);
+  if (LOCAL_APP_MODE) return null;
   if (!user) return null;
 
   if (!user.accessToken) {
@@ -79,6 +82,7 @@ const UpgradeNotice = () => {
   const { version, latestVersion, EnjoyApp } = useContext(
     AppSettingsProviderContext
   );
+  if (LOCAL_APP_MODE) return null;
   if (!latestVersion) return null;
 
   // compare version with latestVersion by semver

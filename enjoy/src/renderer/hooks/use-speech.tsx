@@ -56,12 +56,7 @@ export const useSpeech = () => {
     let client: OpenAI;
 
     if (engine === "enjoyai") {
-      client = new OpenAI({
-        apiKey: user.accessToken,
-        baseURL: `${apiUrl}/api/ai`,
-        dangerouslyAllowBrowser: true,
-        maxRetries: 1,
-      });
+      throw new Error("EnjoyAI TTS is disabled in local mode");
     } else if (openai) {
       client = new OpenAI({
         apiKey: openai.key,
@@ -89,6 +84,7 @@ export const useSpeech = () => {
     const { model, voice } = configuration;
 
     if (model !== "azure/speech") return;
+    if (!webApi) throw new Error("Azure TTS requires Enjoy API");
 
     const { id, token, region } = await webApi.generateSpeechToken({
       purpose: "tts",

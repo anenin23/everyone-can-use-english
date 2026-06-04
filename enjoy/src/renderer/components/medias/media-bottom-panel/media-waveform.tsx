@@ -32,6 +32,7 @@ import {
   DownloadIcon,
 } from "lucide-react";
 import debounce from "lodash/debounce";
+import { LOCAL_APP_MODE } from "@/constants";
 
 const ZOOM_RATIO_OPTIONS = [
   0.25, 0.5, 0.75, 1.0, 1.25, 1.5, 1.75, 2.0, 2.5, 3.0, 3.5, 4.0,
@@ -221,12 +222,16 @@ export const MediaWaveform = () => {
         });
       },
     },
-    {
-      name: "share",
-      label: t("share"),
-      icon: Share2Icon,
-      onClick: () => setIsSharing(true),
-    },
+    ...(!LOCAL_APP_MODE
+      ? [
+          {
+            name: "share",
+            label: t("share"),
+            icon: Share2Icon,
+            onClick: () => setIsSharing(true),
+          },
+        ]
+      : []),
     {
       name: "download",
       label: t("download"),

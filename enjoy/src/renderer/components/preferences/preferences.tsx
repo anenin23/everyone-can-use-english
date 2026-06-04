@@ -26,6 +26,7 @@ import {
 import { useState } from "react";
 import { Tooltip } from "react-tooltip";
 import { EmailSettings } from "./email-settings";
+import { LOCAL_APP_MODE } from "@/constants";
 
 export const Preferences = () => {
   const TABS = [
@@ -73,12 +74,20 @@ export const Preferences = () => {
           <div className="font-semibold mb-4 capitilized">
             {t("advancedSettings")}
           </div>
-          <ApiUrlSettings />
-          <Separator />
+          {!LOCAL_APP_MODE && (
+            <>
+              <ApiUrlSettings />
+              <Separator />
+            </>
+          )}
           <ProxySettings />
           <Separator />
-          <NetworkState />
-          <Separator />
+          {!LOCAL_APP_MODE && (
+            <>
+              <NetworkState />
+              <Separator />
+            </>
+          )}
           <OpenaiSettings />
           <Separator />
           <RecorderSettings />
@@ -98,16 +107,24 @@ export const Preferences = () => {
           <div className="font-semibold mb-4 capitilized">
             {t("accountSettings")}
           </div>
-          <UserSettings />
-          <Separator />
+          {!LOCAL_APP_MODE && (
+            <>
+              <UserSettings />
+              <Separator />
+            </>
+          )}
           <LibrarySettings />
           <Separator />
           <DiskUsage />
           <Separator />
-          <EmailSettings />
-          <Separator />
-          <BalanceSettings />
-          <Separator />
+          {!LOCAL_APP_MODE && (
+            <>
+              <EmailSettings />
+              <Separator />
+              <BalanceSettings />
+              <Separator />
+            </>
+          )}
         </div>
       ),
     },

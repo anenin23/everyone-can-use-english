@@ -14,6 +14,7 @@ import {
 } from "@/renderer/components/ui";
 import { t } from "i18next";
 import { LoaderIcon } from "lucide-react";
+import { LOCAL_APP_MODE } from "@/constants";
 
 export const DictImportButton = () => {
   const { reload, importMDict } = useContext(DictProviderContext);
@@ -92,16 +93,18 @@ export const DictImportButton = () => {
                 <div className="mb-2">{t("importAdaptionDict")}</div>
                 <div className="text-xs text-muted-foreground mb-2">
                   {t("adaptionDictTip")}
-                  <a
-                    className="text-blue-600 cursor-pointer"
-                    onClick={() => {
-                      EnjoyApp.shell.openExternal(
-                        "https://1000h.org/enjoy-app/settings.html#词典设置"
-                      );
-                    }}
-                  >
-                    {t("howToDownload")}
-                  </a>
+                  {!LOCAL_APP_MODE && (
+                    <a
+                      className="text-blue-600 cursor-pointer"
+                      onClick={() => {
+                        EnjoyApp.shell.openExternal(
+                          "https://1000h.org/enjoy-app/settings.html#词典设置"
+                        );
+                      }}
+                    >
+                      {t("howToDownload")}
+                    </a>
+                  )}
                 </div>
               </div>
 

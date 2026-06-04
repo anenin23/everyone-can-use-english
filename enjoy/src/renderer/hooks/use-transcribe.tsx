@@ -5,7 +5,7 @@ import {
 import OpenAI from "openai";
 import { useContext, useState } from "react";
 import { t } from "i18next";
-import { AI_WORKER_ENDPOINT } from "@/constants";
+import { AI_WORKER_ENDPOINT, LOCAL_APP_MODE } from "@/constants";
 import * as sdk from "microsoft-cognitiveservices-speech-sdk";
 import axios from "axios";
 import { useAiCommand } from "./use-ai-command";
@@ -86,12 +86,18 @@ export const useTranscribe = () => {
         language,
       });
     } else if (service === SttEngineOptionEnum.ENJOY_CLOUDFLARE) {
+      if (LOCAL_APP_MODE) {
+        throw new Error("Enjoy Cloudflare transcription is disabled in local mode");
+      }
       result = await transcribeByCloudflareAi(blob);
     } else if (service === SttEngineOptionEnum.OPENAI) {
       result = await transcribeByOpenAi(
         new File([blob], "audio.mp3", { type: "audio/mp3" })
       );
     } else {
+      if (LOCAL_APP_MODE) {
+        throw new Error("Enjoy Azure transcription is disabled in local mode");
+      }
       // Azure AI is the default service
       result = await transcribeByAzureAi(
         new File([blob], "audio.wav", { type: "audio/wav" }),
@@ -341,6 +347,9 @@ export const useTranscribe = () => {
   }> => {
     setOutput("Transcribing from Cloudflare...");
     logger.info("Start transcribing from Cloudflare...");
+    if (LOCAL_APP_MODE || !user?.accessToken) {
+      throw new Error("Enjoy Cloudflare transcription is disabled in local mode");
+    }
     try {
       const res: CfWhipserOutputType = (
         await axios.postForm(
@@ -395,6 +404,8 @@ export const useTranscribe = () => {
     segmentTimeline: TimelineEntry[];
     tokenId: number;
   }> => {
+    if (!webApi) throw new Error("Enjoy Azure transcription requires Enjoy API");
+
     const { id, token, region } = await webApi.generateSpeechToken({
       ...params,
       purpose: "transcribe",
