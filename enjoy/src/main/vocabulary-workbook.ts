@@ -1,5 +1,6 @@
 import { ipcMain, IpcMainInvokeEvent } from "electron";
 import fs from "fs-extra";
+import JSZip from "jszip";
 import path from "path";
 import unzipper from "unzipper";
 
@@ -13,11 +14,13 @@ type VocabularySyncOptions = {
   limit?: number;
   mode?: VocabularySyncMode;
   now?: string;
+  reviews?: VocabularyWorkbookReviewType[];
 };
 
 type WorkbookMeaning = MeaningType & {
   workbook: NonNullable<MeaningType["workbook"]> & {
     rowIndex: number;
+    rowNumber: number;
   };
 };
 
@@ -38,11 +41,47 @@ const attr = (attrs: string, name: string) => {
   return match?.[1];
 };
 
+const setAttr = (attrs: string, name: string, value: string) => {
+  const encodedValue = value.replace(/"/g, "&quot;");
+  const attrRegex = new RegExp(`\\s${name}="[^"]*"`, "i");
+  if (attrRegex.test(attrs)) {
+    return attrs.replace(attrRegex, ` ${name}="${encodedValue}"`);
+  }
+
+  return `${attrs} ${name}="${encodedValue}"`;
+};
+
+const removeAttr = (attrs: string, name: string) => {
+  return attrs.replace(new RegExp(`\\s${name}="[^"]*"`, "gi"), "");
+};
+
 const columnIndex = (cellRef: string) => {
   const letters = cellRef.match(/[A-Z]+/)?.[0] || "";
   return letters.split("").reduce((sum, letter) => {
     return sum * 26 + letter.charCodeAt(0) - 64;
   }, 0);
+};
+
+const columnName = (index: number) => {
+  let current = index;
+  let name = "";
+
+  while (current > 0) {
+    const remainder = (current - 1) % 26;
+    name = String.fromCharCode(65 + remainder) + name;
+    current = Math.floor((current - 1) / 26);
+  }
+
+  return name;
+};
+
+const escapeXml = (value = "") => {
+  return value
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&apos;");
 };
 
 const parseSharedStrings = (xml?: string) => {
@@ -115,16 +154,17 @@ const vocabularySheetPath = async (directory: unzipper.CentralDirectory) => {
 
 const parseRows = (sheetXml: string, sharedStrings: string[]) => {
   const rows: Record<string, string | number | null>[] = [];
-  const rowRegex = /<(?:\w+:)?row\b[^>]*>([\s\S]*?)<\/(?:\w+:)?row>/g;
+  const rowRegex = /<(?:\w+:)?row\b([^>]*)>([\s\S]*?)<\/(?:\w+:)?row>/g;
   let rowMatch: RegExpExecArray | null;
 
   while ((rowMatch = rowRegex.exec(sheetXml))) {
     const row: Record<string, string | number | null> = {};
+    row.__rowNumber = numberValue(attr(rowMatch[1], "r")) || rows.length + 1;
     const cellRegex =
       /<(?:\w+:)?c\b([^>]*?)(?:\/>|>([\s\S]*?)<\/(?:\w+:)?c>)/g;
     let cellMatch: RegExpExecArray | null;
 
-    while ((cellMatch = cellRegex.exec(rowMatch[1]))) {
+    while ((cellMatch = cellRegex.exec(rowMatch[2]))) {
       const attrs = cellMatch[1];
       const body = cellMatch[2] || "";
       const ref = attr(attrs, "r");
@@ -161,7 +201,7 @@ const parseRows = (sheetXml: string, sharedStrings: string[]) => {
   );
 
   return rows.map((row) => {
-    return Object.entries(row).reduce<Record<string, string | number | null>>(
+    const mapped = Object.entries(row).reduce<Record<string, string | number | null>>(
       (acc, [index, value]) => {
         const header = headers[index];
         if (header) acc[header] = value;
@@ -169,6 +209,9 @@ const parseRows = (sheetXml: string, sharedStrings: string[]) => {
       },
       {}
     );
+
+    mapped.__rowNumber = row.__rowNumber;
+    return mapped;
   });
 };
 
@@ -186,6 +229,19 @@ const numberValue = (value: string | number | null | undefined) => {
 const parseTime = (value?: string) => {
   const time = Date.parse(value || "");
   return Number.isFinite(time) ? time : null;
+};
+
+const nowIso = () => new Date().toISOString();
+
+const displayTimestamp = (iso: string) => {
+  return iso.replace("T", " ").replace(/\.\d{3}Z$/, " UTC");
+};
+
+const addDaysIso = (iso: string, days: number) => {
+  const time = parseTime(iso);
+  if (time === null) return iso;
+
+  return new Date(time + days * 24 * 60 * 60 * 1000).toISOString();
 };
 
 const clampReviewStage = (value?: number) => {
@@ -259,9 +315,221 @@ const buildMeanings = (rows: Record<string, string | number | null>[]) => {
           studySessionId: stringValue(row["Study Session ID"]),
           studyAt: stringValue(row["Study At"]),
           rowIndex: index,
+          rowNumber: numberValue(row.__rowNumber) || index + 2,
         },
       } satisfies WorkbookMeaning;
     }) as WorkbookMeaning[];
+};
+
+const reviewKey = (review: Pick<VocabularyWorkbookReviewType, "wordId" | "senseNumber">) => {
+  return `${review.wordId}#${review.senseNumber}`;
+};
+
+const dedupeReviews = (reviews: VocabularyWorkbookReviewType[] = []) => {
+  const byKey = new Map<string, VocabularyWorkbookReviewType>();
+
+  for (const review of reviews) {
+    if (!review.wordId || !review.senseNumber) continue;
+    byKey.set(reviewKey(review), review);
+  }
+
+  return [...byKey.values()];
+};
+
+const headerColumns = (sheetXml: string, sharedStrings: string[]) => {
+  const rowMatch = sheetXml.match(/<(?:\w+:)?row\b[^>]*>([\s\S]*?)<\/(?:\w+:)?row>/);
+  const columns = new Map<string, string>();
+  if (!rowMatch) return columns;
+
+  const cellRegex =
+    /<(?:\w+:)?c\b([^>]*?)(?:\/>|>([\s\S]*?)<\/(?:\w+:)?c>)/g;
+  let cellMatch: RegExpExecArray | null;
+  while ((cellMatch = cellRegex.exec(rowMatch[1]))) {
+    const attrs = cellMatch[1];
+    const ref = attr(attrs, "r");
+    if (!ref) continue;
+
+    const valueMatch = (cellMatch[2] || "").match(
+      /<(?:\w+:)?v\b[^>]*>([\s\S]*?)<\/(?:\w+:)?v>/
+    );
+    if (!valueMatch) continue;
+
+    const type = attr(attrs, "t");
+    const rawValue = decodeXml(valueMatch[1]);
+    const value = type === "s" ? sharedStrings[Number(rawValue)] : rawValue;
+    columns.set(value, ref.match(/[A-Z]+/)?.[0] || "");
+  }
+
+  return columns;
+};
+
+const cellXml = (ref: string, value: string | number, type: "n" | "str") => {
+  if (type === "n") {
+    return `<x:c r="${ref}" t="n"><x:v>${value}</x:v></x:c>`;
+  }
+
+  return `<x:c r="${ref}" t="str"><x:v>${escapeXml(String(value))}</x:v></x:c>`;
+};
+
+const updateCell = (
+  sheetXml: string,
+  ref: string,
+  value: string | number,
+  type: "n" | "str"
+) => {
+  const cellRegex = new RegExp(
+    `<((?:\\w+:)?c)\\b([^>]*\\br="${ref}"[^>]*)(?:\\/>|>([\\s\\S]*?)<\\/\\1>)`
+  );
+  const nextValue =
+    type === "n"
+      ? `<x:v>${value}</x:v>`
+      : `<x:v>${escapeXml(String(value))}</x:v>`;
+
+  if (cellRegex.test(sheetXml)) {
+    return sheetXml.replace(cellRegex, (_match, tag, attrs) => {
+      const nextAttrs = setAttr(removeAttr(attrs, "t"), "t", type);
+      return `<${tag}${nextAttrs}>${nextValue}</${tag}>`;
+    });
+  }
+
+  const rowNumber = Number(ref.match(/\d+/)?.[0] || 0);
+  const col = ref.match(/[A-Z]+/)?.[0] || "";
+  const rowRegex = new RegExp(
+    `(<((?:\\w+:)?row)\\b[^>]*\\br="${rowNumber}"[^>]*>)([\\s\\S]*?)(<\\/\\2>)`
+  );
+
+  return sheetXml.replace(rowRegex, (match, open, _rowTag, body, close) => {
+    const newCell = cellXml(ref, value, type);
+    const targetIndex = columnIndex(col);
+    const existingCellRegex =
+      /<((?:\w+:)?c)\b([^>]*\br="[A-Z]+\d+"[^>]*)(?:\/>|>[\s\S]*?<\/\1>)/g;
+    let existingMatch: RegExpExecArray | null;
+    while ((existingMatch = existingCellRegex.exec(body))) {
+      const existingRef = attr(existingMatch[2], "r");
+      const existingIndex = columnIndex(existingRef || "");
+      if (existingIndex > targetIndex) {
+        const before = body.slice(0, existingMatch.index);
+        const after = body.slice(existingMatch.index);
+        return `${open}${before}${newCell}${after}${close}`;
+      }
+    }
+
+    return `${open}${body}${newCell}${close}`;
+  });
+};
+
+const writeWorkbookReviews = async (
+  filePath: string,
+  reviews: VocabularyWorkbookReviewType[] = []
+) => {
+  const uniqueReviews = dedupeReviews(reviews);
+  if (uniqueReviews.length === 0) return 0;
+
+  const directory = await unzipper.Open.file(filePath);
+  const sheetPath = await vocabularySheetPath(directory);
+  const sheetXml = await readZipEntry(directory, sheetPath);
+  const sharedStringsXml = await readZipEntry(directory, "xl/sharedStrings.xml");
+  if (!sheetXml) {
+    throw new Error(`Vocabulary sheet file not found: ${sheetPath}`);
+  }
+
+  const sharedStrings = parseSharedStrings(sharedStringsXml);
+  const rows = parseRows(sheetXml, sharedStrings);
+  const meanings = buildMeanings(rows);
+  const meaningsByKey = new Map(
+    meanings.map((meaning) => [
+      reviewKey({
+        wordId: meaning.workbook.wordId,
+        senseNumber: meaning.workbook.senseNumber,
+      }),
+      meaning,
+    ])
+  );
+  const columns = headerColumns(sheetXml, sharedStrings);
+  const requiredHeaders = [
+    "Review Count",
+    "Mastery",
+    "Last Reviewed",
+    "Review Stage",
+    "Next Review At",
+  ];
+
+  for (const header of requiredHeaders) {
+    if (!columns.get(header)) {
+      throw new Error(`Vocabulary sheet is missing required column: ${header}`);
+    }
+  }
+
+  for (const review of uniqueReviews) {
+    if (!meaningsByKey.has(reviewKey(review))) {
+      throw new Error(
+        `Vocabulary review target not found in workbook: ${review.wordId} S${review.senseNumber}`
+      );
+    }
+  }
+
+  let nextSheetXml = sheetXml;
+  for (const review of uniqueReviews) {
+    const meaning = meaningsByKey.get(reviewKey(review));
+    const rowNumber = meaning.workbook.rowNumber;
+    const reviewedAt = review.reviewedAt || nowIso();
+    const reviewCount = Number(meaning.workbook.reviewCount || 0) + 1;
+    const mastery = review.mastery === 1 ? 1 : 0;
+    const reviewStage =
+      mastery === 1
+        ? Math.min(
+            clampReviewStage(meaning.workbook.reviewStage) + 1,
+            REVIEW_INTERVAL_DAYS.length - 1
+          )
+        : 0;
+    const nextReviewAt =
+      mastery === 1
+        ? addDaysIso(reviewedAt, REVIEW_INTERVAL_DAYS[reviewStage])
+        : reviewedAt;
+
+    nextSheetXml = updateCell(
+      nextSheetXml,
+      `${columns.get("Review Count")}${rowNumber}`,
+      reviewCount,
+      "n"
+    );
+    nextSheetXml = updateCell(
+      nextSheetXml,
+      `${columns.get("Mastery")}${rowNumber}`,
+      mastery,
+      "n"
+    );
+    nextSheetXml = updateCell(
+      nextSheetXml,
+      `${columns.get("Last Reviewed")}${rowNumber}`,
+      displayTimestamp(reviewedAt),
+      "str"
+    );
+    nextSheetXml = updateCell(
+      nextSheetXml,
+      `${columns.get("Review Stage")}${rowNumber}`,
+      reviewStage,
+      "n"
+    );
+    nextSheetXml = updateCell(
+      nextSheetXml,
+      `${columns.get("Next Review At")}${rowNumber}`,
+      displayTimestamp(nextReviewAt),
+      "str"
+    );
+  }
+
+  const zip = await JSZip.loadAsync(await fs.readFile(filePath));
+  zip.file(sheetPath, nextSheetXml);
+
+  const tempPath = `${filePath}.enjoy-sync-${Date.now()}.tmp`;
+  await fs.writeFile(
+    tempPath,
+    await zip.generateAsync({ compression: "DEFLATE", type: "nodebuffer" })
+  );
+  await fs.move(tempPath, filePath, { overwrite: true });
+
+  return uniqueReviews.length;
 };
 
 const isDueForReview = (meaning: WorkbookMeaning, nowMs: number) => {
@@ -402,6 +670,10 @@ const syncWorkbook = async (
     throw new Error(`Vocabulary workbook not found: ${filePath}`);
   }
 
+  const appliedReviewCount = await writeWorkbookReviews(
+    filePath,
+    options.reviews || []
+  );
   const directory = await unzipper.Open.file(filePath);
   const sheetPath = await vocabularySheetPath(directory);
   const sheetXml = await readZipEntry(directory, sheetPath);
@@ -429,6 +701,7 @@ const syncWorkbook = async (
     sourceMeaningCount: meanings.length,
     dueReviewCount: selected.dueReviewCount,
     newMeaningCount: selected.newMeaningCount,
+    appliedReviewCount,
     syncLimit: selected.limit,
     syncMode: selected.mode,
     rowCount: rows.length,

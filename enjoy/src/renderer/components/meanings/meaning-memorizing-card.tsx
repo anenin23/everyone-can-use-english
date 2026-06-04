@@ -6,7 +6,11 @@ import { useHotkeys } from "react-hotkeys-hook";
 import { HotKeysSettingsProviderContext } from "@renderer/context";
 import { Sentence } from "@renderer/components";
 
-export const MeaningMemorizingCard = (props: { meaning: MeaningType }) => {
+export const MeaningMemorizingCard = (props: {
+  meaning: MeaningType;
+  pendingReview?: VocabularyWorkbookReviewType;
+  onReview?: (meaning: MeaningType, mastery: 0 | 1) => void;
+}) => {
   const {
     meaning: { word, lookups },
   } = props;
@@ -35,7 +39,14 @@ export const MeaningMemorizingCard = (props: { meaning: MeaningType }) => {
       <FrontSide word={word} lookups={lookups} onFlip={() => setSide("back")} />
     );
   if (side === "back")
-    return <BackSide meaning={props.meaning} onFlip={() => setSide("front")} />;
+    return (
+      <BackSide
+        meaning={props.meaning}
+        pendingReview={props.pendingReview}
+        onReview={props.onReview}
+        onFlip={() => setSide("front")}
+      />
+    );
 };
 
 const FrontSide = (props: {
@@ -93,7 +104,12 @@ const FrontSide = (props: {
   );
 };
 
-const BackSide = (props: { meaning: MeaningType; onFlip: () => void }) => {
+const BackSide = (props: {
+  meaning: MeaningType;
+  pendingReview?: VocabularyWorkbookReviewType;
+  onReview?: (meaning: MeaningType, mastery: 0 | 1) => void;
+  onFlip: () => void;
+}) => {
   const {
     meaning: {
       id,
@@ -105,6 +121,9 @@ const BackSide = (props: { meaning: MeaningType; onFlip: () => void }) => {
       translation,
       lookups,
     },
+    meaning,
+    pendingReview,
+    onReview,
     onFlip,
   } = props;
 
@@ -170,7 +189,23 @@ const BackSide = (props: { meaning: MeaningType; onFlip: () => void }) => {
         </div>
       </ScrollArea>
 
-      <div className="mt-4 flex items-center justify-center">
+      <div className="mt-4 flex flex-wrap items-center justify-center gap-2">
+        {onReview && (
+          <>
+            <Button
+              variant={pendingReview?.mastery === 0 ? "destructive" : "outline"}
+              onClick={() => onReview(meaning, 0)}
+            >
+              Not mastered
+            </Button>
+            <Button
+              variant={pendingReview?.mastery === 1 ? "default" : "outline"}
+              onClick={() => onReview(meaning, 1)}
+            >
+              Mastered
+            </Button>
+          </>
+        )}
         <Button
           id="vocabulary-toggle-side-button"
           variant="secondary"
@@ -179,6 +214,12 @@ const BackSide = (props: { meaning: MeaningType; onFlip: () => void }) => {
           {t("frontSide")}
         </Button>
       </div>
+      {pendingReview && (
+        <div className="mt-2 text-center text-xs text-muted-foreground">
+          Pending workbook sync:{" "}
+          {pendingReview.mastery === 1 ? "mastered" : "not mastered"}
+        </div>
+      )}
     </div>
   );
 };

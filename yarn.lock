@@ -14596,6 +14596,7 @@ __metadata:
     input-otp: "npm:^1.4.2"
     intl-tel-input: "npm:^25.3.0"
     js-md5: "npm:^0.8.3"
+    jszip: "npm:3.10.1"
     langchain: "npm:^0.3.19"
     lodash: "npm:^4.17.21"
     lru-cache: "npm:^11.0.2"
@@ -18532,7 +18533,7 @@ __metadata:
   languageName: node
   linkType: hard
 
-"jszip@npm:^3.1.0":
+"jszip@npm:3.10.1, jszip@npm:^3.1.0":
   version: 3.10.1
   resolution: "jszip@npm:3.10.1"
   dependencies:

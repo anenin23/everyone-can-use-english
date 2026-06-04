@@ -28,9 +28,14 @@ export default () => {
   const [currentIndex, setCurrentIndex] = useState<number>(0);
   const [nextPage, setNextPage] = useState<number | null>(1);
 
+  const reviewKey = (review: Pick<VocabularyWorkbookReviewType, "wordId" | "senseNumber">) => {
+    return `${review.wordId}#${review.senseNumber}`;
+  };
+
   const syncOptions = () => ({
     limit: vocabularyConfig?.syncLimit || 10,
     mode: vocabularyConfig?.syncMode || "due_first",
+    reviews: vocabularyConfig?.pendingReviews || [],
   });
 
   const applyLocalMeanings = (items: MeaningType[]) => {
@@ -69,6 +74,7 @@ export default () => {
         dueReviewCount: result.dueReviewCount,
         newMeaningCount: result.newMeaningCount,
         syncedMeanings: result.meanings,
+        pendingReviews: [],
       });
       applyLocalMeanings(result.meanings);
     } catch (err) {
@@ -109,6 +115,39 @@ export default () => {
       .finally(() => {
         setLoading(false);
       });
+  };
+
+  const pendingReviewFor = (meaning?: MeaningType) => {
+    const wordId = meaning?.workbook?.wordId;
+    const senseNumber = meaning?.workbook?.senseNumber;
+    if (!wordId || !senseNumber) return undefined;
+
+    return (vocabularyConfig?.pendingReviews || []).find((review) => {
+      return reviewKey(review) === reviewKey({ wordId, senseNumber });
+    });
+  };
+
+  const recordReview = async (meaning: MeaningType, mastery: 0 | 1) => {
+    const wordId = meaning.workbook?.wordId;
+    const senseNumber = meaning.workbook?.senseNumber;
+    if (!wordId || !senseNumber) return;
+
+    const review = {
+      meaningId: meaning.id,
+      wordId,
+      senseNumber,
+      mastery,
+      reviewedAt: new Date().toISOString(),
+    } satisfies VocabularyWorkbookReviewType;
+    const pendingReviews = (vocabularyConfig?.pendingReviews || []).filter(
+      (item) => reviewKey(item) !== reviewKey(review)
+    );
+
+    await setVocabularyConfig({
+      ...vocabularyConfig,
+      lookupOnMouseOver: vocabularyConfig?.lookupOnMouseOver ?? true,
+      pendingReviews: [...pendingReviews, review],
+    });
   };
 
   useEffect(() => {
@@ -158,7 +197,13 @@ export default () => {
                     vocabularyConfig.sourceWordCount ||
                     vocabularyConfig.syncedWordCount ||
                     0
-                  } workbook words`
+                  } workbook words${
+                    (vocabularyConfig.pendingReviews || []).length > 0
+                      ? `, ${
+                          (vocabularyConfig.pendingReviews || []).length
+                        } pending review updates`
+                      : ""
+                  }`
                 : "Sync your local workbook to study vocabulary here"}
             </div>
           </div>
@@ -201,7 +246,11 @@ export default () => {
               <ChevronLeftIcon className="size-5" />
             </Button>
             <div className="bg-background flex-1 h-5/6 border p-6 rounded-xl shadow-xl">
-              <MeaningMemorizingCard meaning={meanings[currentIndex]} />
+              <MeaningMemorizingCard
+                meaning={meanings[currentIndex]}
+                pendingReview={pendingReviewFor(meanings[currentIndex])}
+                onReview={recordReview}
+              />
             </div>
             <Button
               variant="secondary"

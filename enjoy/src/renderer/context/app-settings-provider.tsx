@@ -76,6 +76,7 @@ const DEFAULT_VOCABULARY_CONFIG: VocabularyConfigType = {
   syncLimit: 10,
   syncMode: "due_first",
   syncedMeanings: [],
+  pendingReviews: [],
 };
 
 const initialState: AppSettingsProviderState = {

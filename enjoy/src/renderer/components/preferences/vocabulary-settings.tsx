@@ -42,6 +42,7 @@ export const VocabularySettings = () => {
       const result = await EnjoyApp.vocabulary.syncWorkbook(path, {
         limit: syncLimit,
         mode: syncMode,
+        reviews: vocabularyConfig?.pendingReviews || [],
       });
       await setVocabularyConfig({
         ...vocabularyConfig,
@@ -58,6 +59,7 @@ export const VocabularySettings = () => {
         dueReviewCount: result.dueReviewCount,
         newMeaningCount: result.newMeaningCount,
         syncedMeanings: result.meanings,
+        pendingReviews: [],
       });
       toast.success(
         `Synced ${result.selectedWordCount} selected words / ${result.selectedMeaningCount} meanings`
@@ -179,6 +181,13 @@ export const VocabularySettings = () => {
               vocabularyConfig.syncedWordCount ||
               0}{" "}
             workbook words
+          </div>
+        )}
+
+        {(vocabularyConfig?.pendingReviews || []).length > 0 && (
+          <div className="text-sm text-muted-foreground">
+            {(vocabularyConfig?.pendingReviews || []).length} review updates
+            will be written back on the next sync.
           </div>
         )}
       </div>

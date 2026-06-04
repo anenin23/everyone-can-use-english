@@ -154,15 +154,25 @@ type MeaningType = {
     studySessionId?: string;
     studyAt?: string;
     rowIndex?: number;
+    rowNumber?: number;
   };
 };
 
 type VocabularySyncModeType = "due_first" | "new" | "review" | "all";
 
+type VocabularyWorkbookReviewType = {
+  meaningId?: string;
+  wordId: string;
+  senseNumber: number;
+  mastery: 0 | 1;
+  reviewedAt?: string;
+};
+
 type VocabularyWorkbookSyncOptionsType = {
   limit?: number;
   mode?: VocabularySyncModeType;
   now?: string;
+  reviews?: VocabularyWorkbookReviewType[];
 };
 
 type VocabularyWorkbookSyncResultType = {
@@ -177,6 +187,7 @@ type VocabularyWorkbookSyncResultType = {
   sourceMeaningCount: number;
   dueReviewCount: number;
   newMeaningCount: number;
+  appliedReviewCount: number;
   syncLimit: number;
   syncMode: VocabularySyncModeType;
   rowCount: number;
@@ -239,6 +250,7 @@ type VocabularyConfigType = {
   dueReviewCount?: number;
   newMeaningCount?: number;
   syncedMeanings?: MeaningType[];
+  pendingReviews?: VocabularyWorkbookReviewType[];
 };
 
 type YoutubeVideoType = {
