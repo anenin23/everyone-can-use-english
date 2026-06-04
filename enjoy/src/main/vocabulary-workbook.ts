@@ -4,6 +4,22 @@ import path from "path";
 import unzipper from "unzipper";
 
 const textDecoder = new TextDecoder("utf-8");
+const REVIEW_INTERVAL_DAYS = [0, 1, 2, 4, 7, 15, 30];
+const DEFAULT_SYNC_LIMIT = 10;
+const MAX_SYNC_LIMIT = 100;
+
+type VocabularySyncMode = "due_first" | "new" | "review" | "all";
+type VocabularySyncOptions = {
+  limit?: number;
+  mode?: VocabularySyncMode;
+  now?: string;
+};
+
+type WorkbookMeaning = MeaningType & {
+  workbook: NonNullable<MeaningType["workbook"]> & {
+    rowIndex: number;
+  };
+};
 
 const decodeXml = (value = "") => {
   return value
@@ -167,10 +183,37 @@ const numberValue = (value: string | number | null | undefined) => {
   return Number.isNaN(numeric) ? 0 : numeric;
 };
 
+const parseTime = (value?: string) => {
+  const time = Date.parse(value || "");
+  return Number.isFinite(time) ? time : null;
+};
+
+const clampReviewStage = (value?: number) => {
+  const stage = Number(value);
+  if (!Number.isFinite(stage)) return 0;
+
+  return Math.min(
+    Math.max(Math.trunc(stage), 0),
+    REVIEW_INTERVAL_DAYS.length - 1
+  );
+};
+
+const clampSyncLimit = (value?: number) => {
+  const limit = Number(value || DEFAULT_SYNC_LIMIT);
+  if (!Number.isFinite(limit)) return DEFAULT_SYNC_LIMIT;
+
+  return Math.min(Math.max(Math.trunc(limit), 1), MAX_SYNC_LIMIT);
+};
+
+const syncMode = (mode?: string): VocabularySyncMode => {
+  if (mode === "new" || mode === "review" || mode === "all") return mode;
+  return "due_first";
+};
+
 const buildMeanings = (rows: Record<string, string | number | null>[]) => {
   return rows
     .filter((row) => stringValue(row["Word ID"]) && stringValue(row["Word"]))
-    .map((row) => {
+    .map((row, index) => {
       const wordId = stringValue(row["Word ID"]);
       const word = stringValue(row["Word"]);
       const senseNumber = numberValue(row["Sense #"]) || 1;
@@ -215,12 +258,146 @@ const buildMeanings = (rows: Record<string, string | number | null>[]) => {
           nextReviewAt: stringValue(row["Next Review At"]),
           studySessionId: stringValue(row["Study Session ID"]),
           studyAt: stringValue(row["Study At"]),
+          rowIndex: index,
         },
-      };
-    });
+      } satisfies WorkbookMeaning;
+    }) as WorkbookMeaning[];
 };
 
-const syncWorkbook = async (_event: IpcMainInvokeEvent, filePath: string) => {
+const isDueForReview = (meaning: WorkbookMeaning, nowMs: number) => {
+  const dueMs = parseTime(meaning.workbook.nextReviewAt);
+  return dueMs !== null && dueMs <= nowMs;
+};
+
+const compareForSelection = (
+  a: WorkbookMeaning,
+  b: WorkbookMeaning,
+  type: "new" | "review",
+  nowMs: number
+) => {
+  if (type === "review") {
+    const masteryDiff =
+      Number(a.workbook.mastery || 0) - Number(b.workbook.mastery || 0);
+    if (masteryDiff !== 0) return masteryDiff;
+
+    const aOverdue = nowMs - (parseTime(a.workbook.nextReviewAt) || 0);
+    const bOverdue = nowMs - (parseTime(b.workbook.nextReviewAt) || 0);
+    if (aOverdue !== bOverdue) return bOverdue - aOverdue;
+
+    const stageDiff =
+      clampReviewStage(a.workbook.reviewStage) -
+      clampReviewStage(b.workbook.reviewStage);
+    if (stageDiff !== 0) return stageDiff;
+  } else {
+    const countDiff =
+      Number(a.workbook.reviewCount || 0) - Number(b.workbook.reviewCount || 0);
+    if (countDiff !== 0) return countDiff;
+  }
+
+  if (a.workbook.wordId !== b.workbook.wordId) {
+    return a.workbook.wordId.localeCompare(b.workbook.wordId);
+  }
+
+  if (a.workbook.senseNumber !== b.workbook.senseNumber) {
+    return a.workbook.senseNumber - b.workbook.senseNumber;
+  }
+
+  return a.workbook.rowIndex - b.workbook.rowIndex;
+};
+
+const selectUniqueWords = (
+  ordered: WorkbookMeaning[],
+  limit: number,
+  selected: WorkbookMeaning[] = []
+) => {
+  const seenWords = new Set(
+    selected.map((meaning) => meaning.workbook.wordId || meaning.word)
+  );
+  const seenMeanings = new Set(selected.map((meaning) => meaning.id));
+
+  for (const meaning of ordered) {
+    if (selected.length >= limit) break;
+
+    const wordKey = meaning.workbook.wordId || meaning.word;
+    if (seenWords.has(wordKey) || seenMeanings.has(meaning.id)) continue;
+
+    selected.push(meaning);
+    seenWords.add(wordKey);
+    seenMeanings.add(meaning.id);
+    if (selected.length >= limit) break;
+  }
+
+  return selected;
+};
+
+const selectMeanings = (
+  meanings: WorkbookMeaning[],
+  options: VocabularySyncOptions = {}
+) => {
+  const limit = clampSyncLimit(options.limit);
+  const mode = syncMode(options.mode);
+  const nowMs = parseTime(options.now) || Date.now();
+  const byWorkbookOrder = [...meanings].sort((a, b) => {
+    if (a.workbook.wordId !== b.workbook.wordId) {
+      return a.workbook.wordId.localeCompare(b.workbook.wordId);
+    }
+
+    return a.workbook.senseNumber - b.workbook.senseNumber;
+  });
+  const dueReviewMeanings = meanings
+    .filter((meaning) => isDueForReview(meaning, nowMs))
+    .sort((a, b) => compareForSelection(a, b, "review", nowMs));
+  const newMeanings = meanings
+    .filter((meaning) => Number(meaning.workbook.reviewCount || 0) === 0)
+    .sort((a, b) => compareForSelection(a, b, "new", nowMs));
+
+  if (mode === "review") {
+    return {
+      limit,
+      mode,
+      dueReviewCount: dueReviewMeanings.length,
+      newMeaningCount: newMeanings.length,
+      meanings: selectUniqueWords(dueReviewMeanings, limit),
+    };
+  }
+
+  if (mode === "new") {
+    return {
+      limit,
+      mode,
+      dueReviewCount: dueReviewMeanings.length,
+      newMeaningCount: newMeanings.length,
+      meanings: selectUniqueWords(newMeanings, limit),
+    };
+  }
+
+  if (mode === "all") {
+    return {
+      limit,
+      mode,
+      dueReviewCount: dueReviewMeanings.length,
+      newMeaningCount: newMeanings.length,
+      meanings: selectUniqueWords(byWorkbookOrder, limit),
+    };
+  }
+
+  const selected = selectUniqueWords(dueReviewMeanings, limit);
+  selectUniqueWords(newMeanings, limit, selected);
+
+  return {
+    limit,
+    mode,
+    dueReviewCount: dueReviewMeanings.length,
+    newMeaningCount: newMeanings.length,
+    meanings: selected,
+  };
+};
+
+const syncWorkbook = async (
+  _event: IpcMainInvokeEvent,
+  filePath: string,
+  options: VocabularySyncOptions = {}
+) => {
   if (!filePath || !fs.existsSync(filePath)) {
     throw new Error(`Vocabulary workbook not found: ${filePath}`);
   }
@@ -236,16 +413,26 @@ const syncWorkbook = async (_event: IpcMainInvokeEvent, filePath: string) => {
   const rows = parseRows(sheetXml, parseSharedStrings(sharedStringsXml));
   const meanings = buildMeanings(rows);
   const uniqueWords = new Set(meanings.map((meaning) => meaning.word));
+  const selected = selectMeanings(meanings, options);
+  const selectedWords = new Set(selected.meanings.map((meaning) => meaning.word));
   const stat = fs.statSync(filePath);
 
   return {
     sourcePath: filePath,
     sourceMtimeMs: stat.mtimeMs,
     syncedAt: new Date().toISOString(),
-    wordCount: uniqueWords.size,
-    meaningCount: meanings.length,
+    wordCount: selectedWords.size,
+    meaningCount: selected.meanings.length,
+    selectedWordCount: selectedWords.size,
+    selectedMeaningCount: selected.meanings.length,
+    sourceWordCount: uniqueWords.size,
+    sourceMeaningCount: meanings.length,
+    dueReviewCount: selected.dueReviewCount,
+    newMeaningCount: selected.newMeaningCount,
+    syncLimit: selected.limit,
+    syncMode: selected.mode,
     rowCount: rows.length,
-    meanings,
+    meanings: selected.meanings,
   };
 };
 

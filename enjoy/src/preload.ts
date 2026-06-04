@@ -301,8 +301,11 @@ contextBridge.exposeInMainWorld("__ENJOY_APP__", {
     },
   },
   vocabulary: {
-    syncWorkbook: (path: string) => {
-      return ipcRenderer.invoke("vocabulary-sync-workbook", path);
+    syncWorkbook: (
+      path: string,
+      options?: VocabularyWorkbookSyncOptionsType
+    ) => {
+      return ipcRenderer.invoke("vocabulary-sync-workbook", path, options);
     },
   },
   path: {

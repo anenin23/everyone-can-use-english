@@ -73,6 +73,8 @@ const EnjoyApp = window.__ENJOY_APP__;
 const DEFAULT_VOCABULARY_CONFIG: VocabularyConfigType = {
   lookupOnMouseOver: true,
   workbookPath: DEFAULT_VOCABULARY_WORKBOOK_PATH,
+  syncLimit: 10,
+  syncMode: "due_first",
   syncedMeanings: [],
 };
 

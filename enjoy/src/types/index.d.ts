@@ -153,7 +153,16 @@ type MeaningType = {
     nextReviewAt?: string;
     studySessionId?: string;
     studyAt?: string;
+    rowIndex?: number;
   };
+};
+
+type VocabularySyncModeType = "due_first" | "new" | "review" | "all";
+
+type VocabularyWorkbookSyncOptionsType = {
+  limit?: number;
+  mode?: VocabularySyncModeType;
+  now?: string;
 };
 
 type VocabularyWorkbookSyncResultType = {
@@ -162,6 +171,14 @@ type VocabularyWorkbookSyncResultType = {
   syncedAt: string;
   wordCount: number;
   meaningCount: number;
+  selectedWordCount: number;
+  selectedMeaningCount: number;
+  sourceWordCount: number;
+  sourceMeaningCount: number;
+  dueReviewCount: number;
+  newMeaningCount: number;
+  syncLimit: number;
+  syncMode: VocabularySyncModeType;
   rowCount: number;
   meanings: MeaningType[];
 };
@@ -211,10 +228,16 @@ type ProxyConfigType = {
 type VocabularyConfigType = {
   lookupOnMouseOver: boolean;
   workbookPath?: string;
+  syncLimit?: number;
+  syncMode?: VocabularySyncModeType;
   syncedAt?: string;
   syncedWorkbookMtimeMs?: number;
   syncedWordCount?: number;
   syncedMeaningCount?: number;
+  sourceWordCount?: number;
+  sourceMeaningCount?: number;
+  dueReviewCount?: number;
+  newMeaningCount?: number;
   syncedMeanings?: MeaningType[];
 };
 

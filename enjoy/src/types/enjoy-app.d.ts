@@ -171,7 +171,10 @@ type EnjoyAppType = {
     set: (key: UserSettingKeyEnum, value: any) => Promise<void>;
   };
   vocabulary: {
-    syncWorkbook: (path: string) => Promise<VocabularyWorkbookSyncResultType>;
+    syncWorkbook: (
+      path: string,
+      options?: VocabularyWorkbookSyncOptionsType
+    ) => Promise<VocabularyWorkbookSyncResultType>;
   };
   fs: {
     ensureDir: (path: string) => Promise<boolean>;

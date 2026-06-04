@@ -28,6 +28,11 @@ export default () => {
   const [currentIndex, setCurrentIndex] = useState<number>(0);
   const [nextPage, setNextPage] = useState<number | null>(1);
 
+  const syncOptions = () => ({
+    limit: vocabularyConfig?.syncLimit || 10,
+    mode: vocabularyConfig?.syncMode || "due_first",
+  });
+
   const applyLocalMeanings = (items: MeaningType[]) => {
     setMeanings(items);
     setCurrentIndex(0);
@@ -45,15 +50,24 @@ export default () => {
     setError("");
 
     try {
-      const result = await EnjoyApp.vocabulary.syncWorkbook(workbookPath);
+      const result = await EnjoyApp.vocabulary.syncWorkbook(
+        workbookPath,
+        syncOptions()
+      );
       await setVocabularyConfig({
         ...vocabularyConfig,
         lookupOnMouseOver: vocabularyConfig?.lookupOnMouseOver ?? true,
         workbookPath,
+        syncLimit: result.syncLimit,
+        syncMode: result.syncMode,
         syncedAt: result.syncedAt,
         syncedWorkbookMtimeMs: result.sourceMtimeMs,
-        syncedWordCount: result.wordCount,
-        syncedMeaningCount: result.meaningCount,
+        syncedWordCount: result.selectedWordCount,
+        syncedMeaningCount: result.selectedMeaningCount,
+        sourceWordCount: result.sourceWordCount,
+        sourceMeaningCount: result.sourceMeaningCount,
+        dueReviewCount: result.dueReviewCount,
+        newMeaningCount: result.newMeaningCount,
         syncedMeanings: result.meanings,
       });
       applyLocalMeanings(result.meanings);
@@ -100,7 +114,11 @@ export default () => {
   useEffect(() => {
     if (!vocabularyConfig) return;
     fetchMeanings(1);
-  }, [vocabularyConfig?.workbookPath]);
+  }, [
+    vocabularyConfig?.workbookPath,
+    vocabularyConfig?.syncLimit,
+    vocabularyConfig?.syncMode,
+  ]);
 
   useHotkeys(
     [currentHotkeys.PlayPreviousSegment, currentHotkeys.PlayNextSegment],
@@ -134,9 +152,13 @@ export default () => {
             <h1 className="font-bold text-2xl">Vocabulary</h1>
             <div className="text-sm text-muted-foreground">
               {vocabularyConfig?.syncedAt
-                ? `${vocabularyConfig.syncedWordCount || 0} words / ${
+                ? `${vocabularyConfig.syncedWordCount || 0} selected words / ${
                     vocabularyConfig.syncedMeaningCount || 0
-                  } meanings synced`
+                  } meanings from ${
+                    vocabularyConfig.sourceWordCount ||
+                    vocabularyConfig.syncedWordCount ||
+                    0
+                  } workbook words`
                 : "Sync your local workbook to study vocabulary here"}
             </div>
           </div>
