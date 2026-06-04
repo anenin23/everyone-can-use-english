@@ -139,6 +139,31 @@ type MeaningType = {
   definition: string;
   translation: string;
   lookups: LookupType[];
+  workbook?: {
+    wordId: string;
+    senseNumber: number;
+    sourceSentence?: string;
+    englishExample?: string;
+    etymology?: string;
+    notes?: string;
+    reviewCount?: number;
+    mastery?: number;
+    reviewStage?: number;
+    lastReviewed?: string;
+    nextReviewAt?: string;
+    studySessionId?: string;
+    studyAt?: string;
+  };
+};
+
+type VocabularyWorkbookSyncResultType = {
+  sourcePath: string;
+  sourceMtimeMs: number;
+  syncedAt: string;
+  wordCount: number;
+  meaningCount: number;
+  rowCount: number;
+  meanings: MeaningType[];
 };
 
 type PagyResponseType = {
@@ -185,6 +210,12 @@ type ProxyConfigType = {
 
 type VocabularyConfigType = {
   lookupOnMouseOver: boolean;
+  workbookPath?: string;
+  syncedAt?: string;
+  syncedWorkbookMtimeMs?: number;
+  syncedWordCount?: number;
+  syncedMeaningCount?: number;
+  syncedMeanings?: MeaningType[];
 };
 
 type YoutubeVideoType = {

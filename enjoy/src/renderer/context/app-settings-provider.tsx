@@ -5,6 +5,7 @@ import {
   IPA_MAPPINGS,
   LOCAL_APP_MODE,
   LOCAL_USER,
+  DEFAULT_VOCABULARY_WORKBOOK_PATH,
 } from "@/constants";
 import { Client } from "@/api";
 import i18n from "@renderer/i18n";
@@ -68,6 +69,12 @@ type AppSettingsProviderState = {
 };
 
 const EnjoyApp = window.__ENJOY_APP__;
+
+const DEFAULT_VOCABULARY_CONFIG: VocabularyConfigType = {
+  lookupOnMouseOver: true,
+  workbookPath: DEFAULT_VOCABULARY_WORKBOOK_PATH,
+  syncedMeanings: [],
+};
 
 const initialState: AppSettingsProviderState = {
   webApi: null,
@@ -263,11 +270,14 @@ export const AppSettingsProvider = ({
     EnjoyApp.userSettings
       .get(UserSettingKeyEnum.VOCABULARY)
       .then((config) => {
-        setVocabularyConfig(config || { lookupOnMouseOver: true });
+        setVocabularyConfig({
+          ...DEFAULT_VOCABULARY_CONFIG,
+          ...config,
+        });
       })
       .catch((err) => {
         console.error(err);
-        setVocabularyConfig({ lookupOnMouseOver: true });
+        setVocabularyConfig(DEFAULT_VOCABULARY_CONFIG);
       });
   };
 

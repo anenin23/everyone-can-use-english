@@ -29,6 +29,9 @@ export const LOCAL_USER = {
   name: "Local Dev",
 };
 
+export const DEFAULT_VOCABULARY_WORKBOOK_PATH =
+  "/Users/wenping/Library/CloudStorage/Dropbox/10_Projects/vocabulary/workbooks/vocab_2026-05-30_008words.xlsx";
+
 export const STORAGE_WORKER_ENDPOINT = "https://storage.enjoy.bot";
 export const STORAGE_WORKER_ENDPOINTS = [
   "https://storage.enjoy.bot",

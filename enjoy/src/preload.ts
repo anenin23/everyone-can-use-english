@@ -300,6 +300,11 @@ contextBridge.exposeInMainWorld("__ENJOY_APP__", {
       return ipcRenderer.invoke("user-settings-set", key, value);
     },
   },
+  vocabulary: {
+    syncWorkbook: (path: string) => {
+      return ipcRenderer.invoke("vocabulary-sync-workbook", path);
+    },
+  },
   path: {
     join: (...paths: string[]) => {
       return ipcRenderer.invoke("path-join", ...paths);
