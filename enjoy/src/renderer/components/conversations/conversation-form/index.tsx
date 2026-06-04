@@ -43,6 +43,7 @@ import {
   ConversationFormTTS,
 } from "@renderer/components";
 import { LOCAL_APP_MODE } from "@/constants";
+import { parseModelList } from "@renderer/lib/openai-models";
 
 export const ConversationForm = (props: {
   conversation: Partial<ConversationType>;
@@ -112,8 +113,9 @@ export const ConversationForm = (props: {
       console.warn(`No ollama server found: ${e.message}`);
     }
 
-    if (openai?.models) {
-      providers["openai"].models = openai.models.split(",");
+    const openAiModels = parseModelList(openai?.models);
+    if (openAiModels.length) {
+      providers["openai"].models = openAiModels;
     }
 
     setGptProviders({ ...providers });

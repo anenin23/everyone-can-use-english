@@ -15,10 +15,16 @@ import {
 } from "@renderer/components/ui";
 import { AISettingsProviderContext } from "@renderer/context";
 import { useContext, useState } from "react";
+import {
+  fetchOpenAiModelIds,
+  parseModelList,
+  serializeModelList,
+} from "@renderer/lib/openai-models";
 
 export const OpenaiSettings = () => {
   const { openai, setOpenai } = useContext(AISettingsProviderContext);
   const [editing, setEditing] = useState(false);
+  const [refreshingModels, setRefreshingModels] = useState(false);
 
   const openAiConfigSchema = z.object({
     key: z.string().optional(),
@@ -35,9 +41,33 @@ export const OpenaiSettings = () => {
     },
   });
 
+  const refreshModels = async (config: z.infer<typeof openAiConfigSchema>) => {
+    if (!config.key) {
+      toast.warning(t("openaiKeyRequired"));
+      return config.models || "";
+    }
+
+    setRefreshingModels(true);
+    try {
+      const models = await fetchOpenAiModelIds(config);
+      const serializedModels = serializeModelList(models);
+      form.setValue("models", serializedModels);
+      toast.success(t("openaiModelsRefreshed"));
+      return serializedModels;
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      toast.error(`${t("openaiModelsRefreshFailed")}: ${message}`);
+      throw error;
+    } finally {
+      setRefreshingModels(false);
+    }
+  };
+
   const onSubmit = async (data: z.infer<typeof openAiConfigSchema>) => {
-    setOpenai({
+    const models = data.key ? await refreshModels(data) : data.models;
+    await setOpenai?.({
       ...data,
+      models,
     });
     setEditing(false);
     toast.success(t("openaiConfigSaved"));
@@ -99,17 +129,30 @@ export const OpenaiSettings = () => {
                   <FormItem>
                     <div className="flex items-center space-x-2">
                       <FormLabel className="min-w-max">
-                        {t("customModels")}:
+                        {t("availableModels")}:
                       </FormLabel>
                       <Input
-                        disabled={!editing}
+                        disabled
                         placeholder={t("leaveEmptyToUseDefault")}
                         value={field.value}
                         onChange={field.onChange}
                       />
+                      <Button
+                        type="button"
+                        variant="secondary"
+                        size="sm"
+                        disabled={!editing || refreshingModels}
+                        onClick={() => refreshModels(form.getValues())}
+                      >
+                        {refreshingModels ? t("loading") : t("refresh")}
+                      </Button>
                     </div>
                     <FormDescription>
-                      {t("customModelsDescription")}
+                      {parseModelList(field.value).length
+                        ? t("availableModelsDescription", {
+                            count: parseModelList(field.value).length,
+                          })
+                        : t("availableModelsEmptyDescription")}
                     </FormDescription>
                     <FormMessage />
                   </FormItem>

@@ -23,6 +23,11 @@ import {
 import { useContext, useEffect, useState } from "react";
 import { GPT_PROVIDERS } from "@renderer/components";
 import { LOCAL_APP_MODE } from "@/constants";
+import {
+  fetchOpenAiModelIds,
+  parseModelList,
+  serializeModelList,
+} from "@renderer/lib/openai-models";
 
 const LOCAL_GPT_PROVIDERS = {
   openai: GPT_PROVIDERS.openai,
@@ -37,7 +42,7 @@ const DEFAULT_LOCAL_ENGINE: GptEngineSettingType = {
 };
 
 export const DefaultEngineSettings = () => {
-  const { currentGptEngine, setGptEngine, openai } = useContext(
+  const { currentGptEngine, setGptEngine, openai, setOpenai } = useContext(
     AISettingsProviderContext
   );
   const { webApi } = useContext(AppSettingsProviderContext);
@@ -45,6 +50,7 @@ export const DefaultEngineSettings = () => {
     LOCAL_APP_MODE ? LOCAL_GPT_PROVIDERS : GPT_PROVIDERS
   );
   const [editing, setEditing] = useState(false);
+  const [fetchingOpenAiModels, setFetchingOpenAiModels] = useState(false);
   const safeGptEngine =
     currentGptEngine?.name && providers[currentGptEngine.name]
       ? currentGptEngine
@@ -80,7 +86,7 @@ export const DefaultEngineSettings = () => {
 
   const modelOptions = () => {
     if (form.watch("name") === "openai") {
-      const customModels = openai?.models?.split(",")?.filter(Boolean);
+      const customModels = parseModelList(openai?.models);
 
       return customModels?.length ? customModels : providers.openai?.models || [];
     } else if (form.watch("name") === "ollama") {
@@ -97,7 +103,7 @@ export const DefaultEngineSettings = () => {
 
     let options = [...(providers[name]?.models || [])];
     if (name === "openai" && openai?.models) {
-      options = openai.models.split(",");
+      options = parseModelList(openai.models);
     }
     if (!options.length) {
       options = [models.default || "llama3.2"];
@@ -130,6 +136,34 @@ export const DefaultEngineSettings = () => {
         console.error(error);
       });
   }, []);
+
+  useEffect(() => {
+    if (!openai?.key || parseModelList(openai.models).length) return;
+
+    setFetchingOpenAiModels(true);
+    fetchOpenAiModelIds(openai)
+      .then((models) => {
+        const serializedModels = serializeModelList(models);
+        setProviders((currentProviders: any) => ({
+          ...currentProviders,
+          openai: {
+            ...currentProviders.openai,
+            models,
+          },
+        }));
+        return setOpenai?.({
+          ...openai,
+          models: serializedModels,
+        });
+      })
+      .catch((error) => {
+        const message = error instanceof Error ? error.message : String(error);
+        console.warn(`Failed to fetch OpenAI models: ${message}`);
+      })
+      .finally(() => {
+        setFetchingOpenAiModels(false);
+      });
+  }, [openai?.key, openai?.baseUrl]);
 
   return (
     <Form {...form}>
@@ -177,6 +211,9 @@ export const DefaultEngineSettings = () => {
                     <FormMessage />
                     <div className="text-xs text-muted-foreground">
                       {form.watch("name") === "openai" && t("openAiEngineTips")}
+                      {form.watch("name") === "openai" &&
+                        fetchingOpenAiModels &&
+                        ` ${t("loading")}`}
                       {form.watch("name") === "enjoyai" &&
                         t("enjoyAiEngineTips")}
                       {form.watch("name") === "ollama" &&

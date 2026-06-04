@@ -7,6 +7,7 @@ import { SttEngineOptionEnum, UserSettingKeyEnum } from "@/types/enums";
 import { GPT_PROVIDERS, TTS_PROVIDERS } from "@renderer/components";
 import { LOCAL_APP_MODE, WHISPER_MODELS } from "@/constants";
 import log from "electron-log/renderer";
+import { parseModelList } from "@renderer/lib/openai-models";
 
 const logger = log.scope("ai-settings-provider.tsx");
 
@@ -14,7 +15,7 @@ type AISettingsProviderState = {
   sttEngine?: SttEngineOptionEnum;
   setSttEngine?: (name: string) => Promise<void>;
   openai?: LlmProviderType;
-  setOpenai?: (config: LlmProviderType) => void;
+  setOpenai?: (config: LlmProviderType) => Promise<void>;
   setGptEngine?: (engine: GptEngineSettingType) => void;
   currentGptEngine?: GptEngineSettingType;
   gptProviders?: typeof GPT_PROVIDERS;
@@ -101,8 +102,9 @@ export const AISettingsProvider = ({
       console.warn(`No ollama server found: ${e.message}`);
     }
 
-    if (openai?.models) {
-      providers["openai"].models = openai.models.split(",");
+    const openAiModels = parseModelList(openai?.models);
+    if (openAiModels.length) {
+      providers["openai"].models = openAiModels;
     }
 
     setGptProviders({ ...providers });
