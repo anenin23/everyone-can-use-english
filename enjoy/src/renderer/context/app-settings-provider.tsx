@@ -108,6 +108,9 @@ export const AppSettingsProvider = ({
   const [displayPreferences, setDisplayPreferences] = useState<boolean>(false);
 
   const db = useContext(DbProviderContext);
+  const initialized = LOCAL_APP_MODE
+    ? Boolean(user && db.state === "connected")
+    : Boolean(user && db.state === "connected" && libraryPath);
 
   const fetchLanguages = async () => {
     const language = await EnjoyApp.userSettings.get(
@@ -393,7 +396,7 @@ export const AppSettingsProvider = ({
         setProxy: setProxyConfigHandler,
         vocabularyConfig,
         setVocabularyConfig: setVocabularyConfigHandler,
-        initialized: Boolean(user && db.state === "connected" && libraryPath),
+        initialized,
         cable: undefined,
         recorderConfig,
         setRecorderConfig: setRecorderConfigHandler,

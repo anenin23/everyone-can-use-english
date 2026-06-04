@@ -7,11 +7,16 @@ import {
   AppSettingsProviderContext,
   DbProviderContext,
 } from "@renderer/context";
+import { LOCAL_APP_MODE } from "@/constants";
 
 export default () => {
   const { initialized, user } = useContext(AppSettingsProviderContext);
   const [started, setStarted] = useState(false);
   const db = useContext(DbProviderContext);
+
+  if (LOCAL_APP_MODE) {
+    return <Navigate to="/" replace />;
+  }
 
   if (initialized) {
     return <Navigate to="/" replace />;
