@@ -106,8 +106,8 @@ export const VocabularySettings = () => {
         <div>
           <div className="mb-2">Vocabulary workbook</div>
           <div className="text-sm text-muted-foreground">
-            Read-only source. Sync copies words into Enjoy local settings
-            without changing the workbook.
+            Sync imports words into Enjoy and writes review progress back to
+            the workbook review columns.
           </div>
         </div>
 

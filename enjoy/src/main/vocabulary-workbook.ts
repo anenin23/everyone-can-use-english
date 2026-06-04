@@ -153,43 +153,45 @@ const vocabularySheetPath = async (directory: unzipper.CentralDirectory) => {
 };
 
 const parseRows = (sheetXml: string, sharedStrings: string[]) => {
-  const rows: Record<string, string | number | null>[] = [];
-  const rowRegex = /<(?:\w+:)?row\b([^>]*)>([\s\S]*?)<\/(?:\w+:)?row>/g;
-  let rowMatch: RegExpExecArray | null;
+  const rowsByNumber = new Map<number, Record<string, string | number | null>>();
+  const cellRegex =
+    /<(?:\w+:)?c\b([^>]*?)(?:\/>|>([\s\S]*?)<\/(?:\w+:)?c>)/g;
+  let cellMatch: RegExpExecArray | null;
 
-  while ((rowMatch = rowRegex.exec(sheetXml))) {
-    const row: Record<string, string | number | null> = {};
-    row.__rowNumber = numberValue(attr(rowMatch[1], "r")) || rows.length + 1;
-    const cellRegex =
-      /<(?:\w+:)?c\b([^>]*?)(?:\/>|>([\s\S]*?)<\/(?:\w+:)?c>)/g;
-    let cellMatch: RegExpExecArray | null;
+  while ((cellMatch = cellRegex.exec(sheetXml))) {
+    const attrs = cellMatch[1];
+    const body = cellMatch[2] || "";
+    const ref = attr(attrs, "r");
+    if (!ref) continue;
 
-    while ((cellMatch = cellRegex.exec(rowMatch[2]))) {
-      const attrs = cellMatch[1];
-      const body = cellMatch[2] || "";
-      const ref = attr(attrs, "r");
-      if (!ref) continue;
+    const rowNumber = numberValue(ref.match(/\d+/)?.[0]);
+    if (!rowNumber) continue;
 
-      const valueMatch = body.match(/<(?:\w+:)?v\b[^>]*>([\s\S]*?)<\/(?:\w+:)?v>/);
-      const inlineTextMatch = body.match(
-        /<(?:\w+:)?is\b[^>]*>[\s\S]*?<(?:\w+:)?t\b[^>]*>([\s\S]*?)<\/(?:\w+:)?t>[\s\S]*?<\/(?:\w+:)?is>/
-      );
-      const type = attr(attrs, "t");
-      const rawValue = valueMatch?.[1] ?? inlineTextMatch?.[1];
-      let value: string | number | null = rawValue ? decodeXml(rawValue) : null;
+    const row = rowsByNumber.get(rowNumber) || {};
+    row.__rowNumber = rowNumber;
 
-      if (type === "s" && value !== null) {
-        value = sharedStrings[Number(value)] ?? "";
-      } else if (type === "n" && value !== null) {
-        const numeric = Number(value);
-        value = Number.isNaN(numeric) ? value : numeric;
-      }
+    const valueMatch = body.match(/<(?:\w+:)?v\b[^>]*>([\s\S]*?)<\/(?:\w+:)?v>/);
+    const inlineTextMatch = body.match(
+      /<(?:\w+:)?is\b[^>]*>[\s\S]*?<(?:\w+:)?t\b[^>]*>([\s\S]*?)<\/(?:\w+:)?t>[\s\S]*?<\/(?:\w+:)?is>/
+    );
+    const type = attr(attrs, "t");
+    const rawValue = valueMatch?.[1] ?? inlineTextMatch?.[1];
+    let value: string | number | null = rawValue ? decodeXml(rawValue) : null;
 
-      row[String(columnIndex(ref))] = value;
+    if (type === "s" && value !== null) {
+      value = sharedStrings[Number(value)] ?? "";
+    } else if (type === "n" && value !== null) {
+      const numeric = Number(value);
+      value = Number.isNaN(numeric) ? value : numeric;
     }
 
-    rows.push(row);
+    row[String(columnIndex(ref))] = value;
+    rowsByNumber.set(rowNumber, row);
   }
+
+  const rows = [...rowsByNumber.values()].sort((a, b) => {
+    return numberValue(a.__rowNumber) - numberValue(b.__rowNumber);
+  });
 
   const headerRow = rows.shift() || {};
   const headers = Object.entries(headerRow).reduce<Record<string, string>>(
@@ -199,6 +201,9 @@ const parseRows = (sheetXml: string, sharedStrings: string[]) => {
     },
     {}
   );
+
+  let lastWordId = "";
+  let lastWord = "";
 
   return rows.map((row) => {
     const mapped = Object.entries(row).reduce<Record<string, string | number | null>>(
@@ -211,6 +216,18 @@ const parseRows = (sheetXml: string, sharedStrings: string[]) => {
     );
 
     mapped.__rowNumber = row.__rowNumber;
+
+    if (
+      !mapped["Word ID"] &&
+      numberValue(mapped["Sense #"]) > 1 &&
+      mapped["Word"] &&
+      mapped["Word"] === lastWord
+    ) {
+      mapped["Word ID"] = lastWordId;
+    }
+    if (mapped["Word ID"]) lastWordId = stringValue(mapped["Word ID"]);
+    if (mapped["Word"]) lastWord = stringValue(mapped["Word"]);
+
     return mapped;
   });
 };
@@ -371,6 +388,10 @@ const cellXml = (ref: string, value: string | number, type: "n" | "str") => {
   return `<x:c r="${ref}" t="str"><x:v>${escapeXml(String(value))}</x:v></x:c>`;
 };
 
+const cleanCellAttrs = (attrs: string) => {
+  return attrs.replace(/\s*\/\s*$/, "");
+};
+
 const updateCell = (
   sheetXml: string,
   ref: string,
@@ -387,7 +408,7 @@ const updateCell = (
 
   if (cellRegex.test(sheetXml)) {
     return sheetXml.replace(cellRegex, (_match, tag, attrs) => {
-      const nextAttrs = setAttr(removeAttr(attrs, "t"), "t", type);
+      const nextAttrs = setAttr(removeAttr(cleanCellAttrs(attrs), "t"), "t", type);
       return `<${tag}${nextAttrs}>${nextValue}</${tag}>`;
     });
   }
@@ -418,6 +439,78 @@ const updateCell = (
   });
 };
 
+const normalizeCellXml = (cell: string) => {
+  return cell.replace(
+    /<((?:\w+:)?c)\b([^>]*?)\/>/g,
+    (_match, tag, attrs) => `<${tag}${cleanCellAttrs(attrs)} />`
+  ).replace(/\s\/\s+(t="[^"]*")/g, " $1");
+};
+
+const rebuildSheetData = (sheetXml: string, sharedStrings: string[]) => {
+  const sheetDataMatch = sheetXml.match(
+    /<((?:\w+:)?sheetData)\b[^>]*>([\s\S]*?)<\/\1>/
+  );
+  if (!sheetDataMatch) return sheetXml;
+
+  const rowAttrsByNumber = new Map<number, string>();
+  const rowRegex = /<((?:\w+:)?row)\b([^>]*)>([\s\S]*?)<\/\1>/g;
+  let rowMatch: RegExpExecArray | null;
+  while ((rowMatch = rowRegex.exec(sheetDataMatch[2]))) {
+    const rowNumber = numberValue(attr(rowMatch[2], "r"));
+    if (rowNumber && !rowAttrsByNumber.has(rowNumber)) {
+      rowAttrsByNumber.set(rowNumber, rowMatch[2]);
+    }
+  }
+
+  const cellsByRow = new Map<number, Map<string, string>>();
+  const cellRegex =
+    /<((?:\w+:)?c)\b([^>]*\br="[A-Z]+\d+"[^>]*)(?:\/>|>[\s\S]*?<\/\1>)/g;
+  let cellMatch: RegExpExecArray | null;
+  while ((cellMatch = cellRegex.exec(sheetDataMatch[2]))) {
+    const ref = attr(cellMatch[2], "r");
+    const rowNumber = numberValue(ref?.match(/\d+/)?.[0]);
+    const col = ref?.match(/[A-Z]+/)?.[0];
+    if (!rowNumber || !col || !ref) continue;
+
+    const rowCells = cellsByRow.get(rowNumber) || new Map<string, string>();
+    rowCells.set(col, normalizeCellXml(cellMatch[0]));
+    cellsByRow.set(rowNumber, rowCells);
+  }
+
+  const parsedRows = parseRows(sheetXml, sharedStrings);
+  for (const row of parsedRows) {
+    const rowNumber = numberValue(row.__rowNumber);
+    const wordId = stringValue(row["Word ID"]);
+    const word = stringValue(row["Word"]);
+    if (!rowNumber || !wordId || !word) continue;
+
+    const rowCells = cellsByRow.get(rowNumber) || new Map<string, string>();
+    if (!rowCells.has("A")) {
+      rowCells.set("A", cellXml(`A${rowNumber}`, wordId, "str"));
+      cellsByRow.set(rowNumber, rowCells);
+    }
+  }
+
+  const rowXml = [...cellsByRow.entries()]
+    .sort(([a], [b]) => a - b)
+    .map(([rowNumber, rowCells]) => {
+      const attrs =
+        cleanCellAttrs(rowAttrsByNumber.get(rowNumber) || ` r="${rowNumber}"`);
+      const cells = [...rowCells.entries()]
+        .sort(([a], [b]) => columnIndex(a) - columnIndex(b))
+        .map(([, cell]) => cell)
+        .join("");
+
+      return `<x:row${attrs}>${cells}</x:row>`;
+    })
+    .join("");
+
+  return sheetXml.replace(
+    sheetDataMatch[0],
+    `<${sheetDataMatch[1]}>${rowXml}</${sheetDataMatch[1]}>`
+  );
+};
+
 const writeWorkbookReviews = async (
   filePath: string,
   reviews: VocabularyWorkbookReviewType[] = []
@@ -427,13 +520,14 @@ const writeWorkbookReviews = async (
 
   const directory = await unzipper.Open.file(filePath);
   const sheetPath = await vocabularySheetPath(directory);
-  const sheetXml = await readZipEntry(directory, sheetPath);
+  const rawSheetXml = await readZipEntry(directory, sheetPath);
   const sharedStringsXml = await readZipEntry(directory, "xl/sharedStrings.xml");
-  if (!sheetXml) {
+  if (!rawSheetXml) {
     throw new Error(`Vocabulary sheet file not found: ${sheetPath}`);
   }
 
   const sharedStrings = parseSharedStrings(sharedStringsXml);
+  const sheetXml = rebuildSheetData(rawSheetXml, sharedStrings);
   const rows = parseRows(sheetXml, sharedStrings);
   const meanings = buildMeanings(rows);
   const meaningsByKey = new Map(

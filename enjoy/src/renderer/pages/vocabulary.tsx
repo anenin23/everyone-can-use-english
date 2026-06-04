@@ -227,7 +227,13 @@ export default () => {
 
         {meanings.length === 0 ? (
           <div className="h-[calc(100vh-9rem)]">
-            <NoRecordsFound text="No synced vocabulary yet" />
+            <NoRecordsFound
+              text={
+                vocabularyConfig?.syncedAt
+                  ? "No vocabulary selected for this sync"
+                  : "No synced vocabulary yet"
+              }
+            />
           </div>
         ) : (
           <div className="h-[calc(100vh-8rem)] flex items-center justify-between space-x-6">
